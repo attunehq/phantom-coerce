@@ -152,7 +152,7 @@ fn main() {
 
 The `#[derive(Coerce)]` macro generates:
 
-1. **For borrowed coercions**: A trait `Coerce{TypeName}<Output>` with a `coerce(&self) -> &Output` method
+1. **For borrowed coercions**: A trait `CoerceRef{TypeName}<Output>` with a `coerce(&self) -> &Output` method
 2. **For owned coercions**: A trait `CoerceOwned{TypeName}<Output>` with an `into_coerced(self) -> Output` method
 3. **For cloned coercions**: A trait `CoerceCloned{TypeName}<Output>` with a `to_coerced(&self) -> Output` method
 4. Implementations for each target type specified in attributes
@@ -162,11 +162,11 @@ The `#[derive(Coerce)]` macro generates:
 For borrowed coercions:
 
 ```rust
-trait CoerceTypedPath<Output: ?Sized> {
+trait CoerceRefTypedPath<Output: ?Sized> {
     fn coerce(&self) -> &Output;
 }
 
-impl<Base, Type> CoerceTypedPath<TypedPath<Relative, File>> for TypedPath<Base, Type> {
+impl<Base, Type> CoerceRefTypedPath<TypedPath<Relative, File>> for TypedPath<Base, Type> {
     fn coerce(&self) -> &TypedPath<Relative, File> {
         // Compile-time safety guards: ensure all fields are accounted for
         let TypedPath { base: _, ty: _, path: _ } = self;

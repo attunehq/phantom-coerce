@@ -81,7 +81,7 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         .collect();
 
     if !borrowed_targets.is_empty() {
-        let trait_name = Ident::new(&format!("Coerce{}", struct_name), struct_name.span());
+        let trait_name = Ident::new(&format!("CoerceRef{}", struct_name), struct_name.span());
 
         let trait_def = quote! {
             trait #trait_name<Output: ?Sized> {
