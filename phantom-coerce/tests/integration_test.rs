@@ -54,19 +54,6 @@ fn test_multi_param_coercion() {
     assert_eq!(coerced.as_str(), "/home/user/file.txt");
 }
 
-#[test]
-fn test_chained_coercion() {
-    let path = TypedPath::<Absolute, File>::new("/home/user/file.txt".to_string());
-
-    // First coerce Base
-    let step1: &TypedPath<SomeBase, File> = path.coerce();
-
-    // Then coerce Type - this should work because we defined the trait for the original type
-    // Note: This won't work as-is because the trait is defined on TypedPath<Absolute, File>
-    // not on TypedPath<SomeBase, File>. This is expected behavior.
-    assert_eq!(step1.as_str(), "/home/user/file.txt");
-}
-
 // Test with a simple single-parameter type
 #[derive(Coerce)]
 #[coerce(borrowed = "Simple<OtherMarker>")]
@@ -377,5 +364,27 @@ fn test_asref_integration() {
     // AsRef uses coerce internally
     let coerced: &AsRefTest<ToAsRef> = test.coerce();
     assert_eq!(coerced.get_value(), 123);
+
+    // Can also use turbofish syntax
+    let turbofish = test.coerce_ref::<AsRefTest<ToAsRef>>();
+    assert_eq!(turbofish.get_value(), 123);
+}
+
+#[test]
+fn test_turbofish_syntax() {
+    // Test borrowed with turbofish
+    let path = TypedPath::<Absolute, File>::new("/test".to_string());
+    let coerced = path.coerce_ref::<TypedPath<SomeBase, File>>();
+    assert_eq!(coerced.as_str(), "/test");
+
+    // Test owned with turbofish
+    let owned = Owned::<OriginalOwned>::new("owned turbofish".to_string());
+    let coerced_owned = owned.into_coerced_ext::<Owned<OtherOwned>>();
+    assert_eq!(coerced_owned.get_value(), "owned turbofish");
+
+    // Test cloned with turbofish
+    let cloned = Cloned::<ClonedMarker1>::new("turbofish".to_string());
+    let coerced_cloned = cloned.to_coerced_ext::<Cloned<OtherMarker>>();
+    assert_eq!(coerced_cloned.get_value(), "turbofish");
 }
 

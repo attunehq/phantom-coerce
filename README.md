@@ -61,6 +61,22 @@ fn main() {
 }
 ```
 
+#### Turbofish Syntax
+
+All coercion methods also have `_ext` variants that support turbofish syntax:
+
+```rust
+let path = TypedPath::<Absolute, File> { /* ... */ };
+
+// Instead of:
+let coerced: &TypedPath<Relative, File> = path.coerce();
+
+// You can use:
+let coerced = path.coerce_ref::<TypedPath<Relative, File>>();
+```
+
+Similarly, `into_coerced_ext::<T>()` and `to_coerced_ext::<T>()` are available for owned and cloned coercions.
+
 #### Optional `AsRef` Integration
 
 Add the `asref` marker to also generate `AsRef` implementations:

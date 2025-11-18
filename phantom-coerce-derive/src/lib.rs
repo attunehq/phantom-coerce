@@ -116,9 +116,24 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             }
         }
 
+        // Generate wrapper trait with turbofish support
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+        let wrapper_trait = quote! {
+            impl #impl_generics #struct_name #ty_generics #where_clause {
+                fn coerce_ref<T>(&self) -> &T
+                where
+                    Self: #trait_name<T>,
+                    T: ?Sized,
+                {
+                    #trait_name::coerce(self)
+                }
+            }
+        };
+
         output.extend(quote! {
             #trait_def
             #(#impls)*
+            #wrapper_trait
             #(#asref_impls)*
         });
     }
@@ -152,9 +167,24 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             impls.push(impl_block);
         }
 
+        // Generate wrapper method with turbofish support
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+        let wrapper_method = quote! {
+            impl #impl_generics #struct_name #ty_generics #where_clause {
+                fn into_coerced_ext<T>(self) -> T
+                where
+                    Self: #trait_name<T>,
+                    T: Sized,
+                {
+                    #trait_name::into_coerced(self)
+                }
+            }
+        };
+
         output.extend(quote! {
             #trait_def
             #(#impls)*
+            #wrapper_method
         });
     }
 
@@ -187,9 +217,24 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
             impls.push(impl_block);
         }
 
+        // Generate wrapper method with turbofish support
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+        let wrapper_method = quote! {
+            impl #impl_generics #struct_name #ty_generics #where_clause {
+                fn to_coerced_ext<T>(&self) -> T
+                where
+                    Self: #trait_name<T>,
+                    T: Sized,
+                {
+                    #trait_name::to_coerced(self)
+                }
+            }
+        };
+
         output.extend(quote! {
             #trait_def
             #(#impls)*
+            #wrapper_method
         });
     }
 

@@ -5,7 +5,7 @@ error[E0599]: the method `to_coerced` exists for struct `NoClone<Marker1>`, but 
    | ----------------- method `to_coerced` not found for this struct because it doesn't satisfy `NoClone<Marker1>: Clone` or `_: CoerceClonedNoClone<NoClone<Marker2>>`
 ...
 23 |     let _: NoClone<Marker2> = no_clone.to_coerced();
-   |                                        ^^^^^^^^^^ method cannot be called on `NoClone<Marker1>` due to unsatisfied trait bounds
+   |                                        ^^^^^^^^^^
    |
    = note: trait bound `NoClone<Marker1>: Clone` was not satisfied
 help: consider annotating `NoClone<Marker1>` with `#[derive(Clone)]`
