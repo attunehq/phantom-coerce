@@ -61,5 +61,36 @@
 //! let final_state: State<Final> = state.into_coerced();
 //! # }
 //! ```
+//!
+//! # Cloned Coercion
+//!
+//! Use `#[coerce(cloned = "...")]` to generate cloned coercions (`&T -> U`), requiring `Clone`:
+//!
+//! ```rust
+//! use std::marker::PhantomData;
+//! use phantom_coerce::Coerce;
+//!
+//! # #[derive(Clone)]
+//! # struct Source;
+//! # #[derive(Clone)]
+//! # struct Target;
+//! #
+//! #[derive(Coerce, Clone)]
+//! #[coerce(cloned = "Message<Target>")]
+//! struct Message<M> {
+//!     marker: PhantomData<M>,
+//!     content: String,
+//! }
+//!
+//! # fn main() {
+//! let msg = Message::<Source> {
+//!     marker: PhantomData,
+//!     content: "Hello".to_string(),
+//! };
+//! // Clone and coerce (source remains usable)
+//! let coerced: Message<Target> = msg.to_coerced();
+//! assert_eq!(msg.content, "Hello"); // Original still available
+//! # }
+//! ```
 
 pub use phantom_coerce_derive::Coerce;

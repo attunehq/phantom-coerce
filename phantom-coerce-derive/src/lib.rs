@@ -9,6 +9,7 @@ use syn::{
 enum CoercionKind {
     Borrowed(String),
     Owned(String),
+    Cloned(String),
 }
 
 #[proc_macro_derive(Coerce, attributes(coerce))]
@@ -140,6 +141,43 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         });
     }
 
+    // Generate cloned coercions
+    let cloned_targets: Vec<_> = coercions.iter()
+        .filter_map(|c| match c {
+            CoercionKind::Cloned(s) => Some(s.clone()),
+            _ => None,
+        })
+        .collect();
+
+    if !cloned_targets.is_empty() {
+        let trait_name = Ident::new(&format!("CoerceCloned{}", struct_name), struct_name.span());
+
+        let trait_def = quote! {
+            trait #trait_name<Output> {
+                fn to_coerced(&self) -> Output;
+            }
+        };
+
+        let mut impls = Vec::new();
+        for target_str in &cloned_targets {
+            let target_type: Type = syn::parse_str(target_str)?;
+            let impl_block = generate_cloned_impl(
+                struct_name,
+                generics,
+                &trait_name,
+                &target_type,
+                fields,
+                &phantom_fields,
+            )?;
+            impls.push(impl_block);
+        }
+
+        output.extend(quote! {
+            #trait_def
+            #(#impls)*
+        });
+    }
+
     Ok(output)
 }
 
@@ -164,10 +202,12 @@ fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<CoercionKind>> {
         CoercionKind::Borrowed
     } else if parsed.path.is_ident("owned") {
         CoercionKind::Owned
+    } else if parsed.path.is_ident("cloned") {
+        CoercionKind::Cloned
     } else {
         return Err(syn::Error::new_spanned(
             &parsed.path,
-            "Expected 'borrowed' or 'owned' in #[coerce(borrowed = \"...\")] or #[coerce(owned = \"...\")]"
+            "Expected 'borrowed', 'owned', or 'cloned' in #[coerce(...)]"
         ));
     };
 
@@ -280,6 +320,62 @@ fn generate_owned_impl(
                 // SAFETY: Types differ only in PhantomData type parameters.
                 // The destructuring pattern above ensures this at compile time.
                 unsafe { std::mem::transmute(self) }
+            }
+        }
+    })
+}
+
+fn generate_cloned_impl(
+    struct_name: &Ident,
+    generics: &syn::Generics,
+    trait_name: &Ident,
+    target_type: &Type,
+    fields: &syn::FieldsNamed,
+    _phantom_fields: &[&Ident],
+) -> syn::Result<proc_macro2::TokenStream> {
+    let Type::Path(target_path) = target_type else {
+        return Err(syn::Error::new_spanned(
+            target_type,
+            "Coerce target must be a type path"
+        ));
+    };
+
+    let target_segment = target_path.path.segments.last().unwrap();
+    let PathArguments::AngleBracketed(_target_args) = &target_segment.arguments else {
+        return Err(syn::Error::new_spanned(
+            target_type,
+            "Coerce target must have type parameters"
+        ));
+    };
+
+    // Build where clause with Clone bound on the struct itself
+    let mut where_clause = generics.where_clause.clone().unwrap_or_else(|| syn::WhereClause {
+        where_token: syn::token::Where::default(),
+        predicates: syn::punctuated::Punctuated::new(),
+    });
+
+    // Add Clone bound on the entire struct
+    let (_, ty_generics, _) = generics.split_for_impl();
+    where_clause.predicates.push(syn::parse_quote!(#struct_name #ty_generics: Clone));
+
+    // Generate destructuring pattern for all fields
+    let field_destructure: Vec<_> = fields.named.iter().map(|f| {
+        let field_name = f.ident.as_ref().unwrap();
+        quote! { #field_name: _ }
+    }).collect();
+
+    let (impl_generics, _, _) = generics.split_for_impl();
+
+    Ok(quote! {
+        impl #impl_generics #trait_name<#target_type> for #struct_name #impl_generics #where_clause {
+            fn to_coerced(&self) -> #target_type {
+                // Compile-time safety guard: ensure all fields are accounted for
+                let #struct_name { #(#field_destructure),* } = self;
+
+                // SAFETY: Types differ only in PhantomData type parameters.
+                // The destructuring pattern above ensures this at compile time.
+                // The source type is cloned and then transmuted.
+                unsafe { std::mem::transmute(self.clone()) }
             }
         }
     })

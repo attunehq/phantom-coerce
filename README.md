@@ -90,13 +90,48 @@ fn main() {
 }
 ```
 
+### Cloned Coercion
+
+Cloned coercions allow you to convert `&T` to `U` by cloning, requiring the source type to implement `Clone`:
+
+```rust
+use std::marker::PhantomData;
+use phantom_coerce::Coerce;
+
+struct Source;
+struct Target;
+
+#[derive(Coerce, Clone)]
+#[coerce(cloned = "Message<Target>")]
+struct Message<M> {
+    marker: PhantomData<M>,
+    content: String,
+    metadata: Vec<String>,
+}
+
+fn main() {
+    let msg = Message::<Source> {
+        marker: PhantomData,
+        content: "Hello".to_string(),
+        metadata: vec!["tag1".to_string()],
+    };
+
+    // Clone and coerce to different phantom type (source remains usable)
+    let coerced: Message<Target> = msg.to_coerced();
+
+    // Original is still available
+    println!("{}", msg.content);
+}
+```
+
 ## How It Works
 
 The `#[derive(Coerce)]` macro generates:
 
 1. **For borrowed coercions**: A trait `Coerce{TypeName}<Output>` with a `coerce(&self) -> &Output` method
 2. **For owned coercions**: A trait `CoerceOwned{TypeName}<Output>` with an `into_coerced(self) -> Output` method
-3. Implementations for each target type specified in attributes
+3. **For cloned coercions**: A trait `CoerceCloned{TypeName}<Output>` with a `to_coerced(&self) -> Output` method
+4. Implementations for each target type specified in attributes
 
 ### Generated Code (Borrowed)
 
@@ -139,6 +174,31 @@ impl<S> CoerceOwnedState<State<Final>> for State<S> {
         // SAFETY: Types differ only in PhantomData type parameters.
         // The destructuring pattern above ensures this at compile time.
         unsafe { std::mem::transmute(self) }
+    }
+}
+```
+
+### Generated Code (Cloned)
+
+For cloned coercions:
+
+```rust
+trait CoerceClonedMessage<Output> {
+    fn to_coerced(&self) -> Output;
+}
+
+impl<M> CoerceClonedMessage<Message<Target>> for Message<M>
+where
+    Message<M>: Clone,
+{
+    fn to_coerced(&self) -> Message<Target> {
+        // Compile-time safety guard: ensure all fields are accounted for
+        let Message { marker: _, content: _, metadata: _ } = self;
+
+        // SAFETY: Types differ only in PhantomData type parameters.
+        // The destructuring pattern above ensures this at compile time.
+        // The source type is cloned and then transmuted.
+        unsafe { std::mem::transmute(self.clone()) }
     }
 }
 ```

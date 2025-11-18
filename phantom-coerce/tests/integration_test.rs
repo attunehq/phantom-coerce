@@ -109,7 +109,9 @@ struct Complex<D, S> {
     real_field2: i32,
 }
 
+#[derive(Clone)]
 struct A;
+#[derive(Clone)]
 struct B;
 struct State;
 struct OtherState;
@@ -203,8 +205,11 @@ struct MultiOwned<P1, P2> {
     data: Vec<i32>,
 }
 
+#[derive(Clone)]
 struct X;
+#[derive(Clone)]
 struct Y;
+#[derive(Clone)]
 struct Z;
 
 impl<P1, P2> MultiOwned<P1, P2> {
@@ -232,4 +237,105 @@ fn test_multi_owned_coercion() {
     // Can chain owned coercions
     let coerced2: MultiOwned<Y, X> = coerced.into_coerced();
     assert_eq!(coerced2.sum(), 15);
+}
+
+// Test cloned coercions (requires Clone)
+#[derive(Coerce, Clone)]
+#[coerce(cloned = "Cloned<OtherMarker>")]
+struct Cloned<Marker> {
+    phantom: PhantomData<Marker>,
+    value: String,
+}
+
+#[derive(Clone)]
+struct ClonedMarker1;
+
+impl<M> Cloned<M> {
+    fn new(value: String) -> Self {
+        Self {
+            phantom: PhantomData,
+            value,
+        }
+    }
+
+    fn get_value(&self) -> &str {
+        &self.value
+    }
+}
+
+#[test]
+fn test_cloned_coercion() {
+    let cloned = Cloned::<ClonedMarker1>::new("hello cloned".to_string());
+
+    // Clone and coerce (source remains usable)
+    let coerced: Cloned<OtherMarker> = cloned.to_coerced();
+    assert_eq!(coerced.get_value(), "hello cloned");
+
+    // Original is still available
+    assert_eq!(cloned.get_value(), "hello cloned");
+
+    // Can call to_coerced multiple times
+    let coerced2: Cloned<OtherMarker> = cloned.to_coerced();
+    assert_eq!(coerced2.get_value(), "hello cloned");
+}
+
+// Test cloned with non-Clone fields should not compile (compile-time check)
+// This is commented out since it should fail to compile
+// #[derive(Coerce)]
+// #[coerce(cloned = "NonCloneable<OtherMarker>")]
+// struct NonCloneable<Marker> {
+//     phantom: PhantomData<Marker>,
+//     value: std::rc::Rc<String>, // Rc is Clone
+//     non_clone: std::sync::MutexGuard<'static, i32>, // MutexGuard is NOT Clone
+// }
+
+// Test cloned with complex types
+#[derive(Coerce, Clone)]
+#[coerce(cloned = "ComplexCloned<B, Y>")]
+#[coerce(cloned = "ComplexCloned<A, Y>")]
+struct ComplexCloned<P1, P2> {
+    p1: PhantomData<P1>,
+    p2: PhantomData<P2>,
+    data: Vec<String>,
+    count: i32,
+}
+
+impl<P1, P2> ComplexCloned<P1, P2> {
+    fn new(data: Vec<String>, count: i32) -> Self {
+        Self {
+            p1: PhantomData,
+            p2: PhantomData,
+            data,
+            count,
+        }
+    }
+
+    fn get_count(&self) -> i32 {
+        self.count
+    }
+
+    fn get_data_len(&self) -> usize {
+        self.data.len()
+    }
+}
+
+#[test]
+fn test_complex_cloned_coercion() {
+    let complex = ComplexCloned::<A, X>::new(
+        vec!["one".to_string(), "two".to_string(), "three".to_string()],
+        42,
+    );
+
+    // Clone and coerce to different markers
+    let coerced1: ComplexCloned<B, Y> = complex.to_coerced();
+    assert_eq!(coerced1.get_count(), 42);
+    assert_eq!(coerced1.get_data_len(), 3);
+
+    // Original still works
+    assert_eq!(complex.get_count(), 42);
+
+    // Can coerce to different target
+    let coerced2: ComplexCloned<A, Y> = complex.to_coerced();
+    assert_eq!(coerced2.get_count(), 42);
+    assert_eq!(coerced2.get_data_len(), 3);
 }
