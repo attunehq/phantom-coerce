@@ -16,6 +16,7 @@ When working with phantom types (types that use `PhantomData<T>` for compile-tim
 - **Zero-cost**: All coercions are compile-time only with no runtime overhead
 - **Ergonomic**: Simple attribute syntax for declaring valid coercions
 - **Safe**: Generated code includes exhaustive field destructuring and type annotations
+- **Flexible**: Supports both borrowed (`&T -> &U`) and owned (`T -> U`) coercions
 
 ## Usage
 
@@ -26,7 +27,9 @@ Add to your `Cargo.toml`:
 phantom-coerce = "0.1"
 ```
 
-### Basic Example
+### Borrowed Coercion
+
+Borrowed coercions allow you to coerce `&T` to `&U`:
 
 ```rust
 use std::marker::PhantomData;
@@ -53,8 +56,37 @@ fn main() {
         path: "/home/user/file.txt".to_string(),
     };
 
-    // Coerce to different phantom types
+    // Coerce to different phantom types (borrowed)
     let coerced: &TypedPath<Relative, File> = path.coerce();
+}
+```
+
+### Owned Coercion
+
+Owned coercions allow you to convert `T` to `U`, consuming the original value:
+
+```rust
+use std::marker::PhantomData;
+use phantom_coerce::Coerce;
+
+struct Initial;
+struct Final;
+
+#[derive(Coerce)]
+#[coerce(owned = "State<Final>")]
+struct State<S> {
+    marker: PhantomData<S>,
+    data: Vec<String>,
+}
+
+fn main() {
+    let state = State::<Initial> {
+        marker: PhantomData,
+        data: vec!["item1".to_string(), "item2".to_string()],
+    };
+
+    // Convert to different phantom type (owned, consumes original)
+    let final_state: State<Final> = state.into_coerced();
 }
 ```
 
@@ -62,12 +94,13 @@ fn main() {
 
 The `#[derive(Coerce)]` macro generates:
 
-1. A trait `Coerce{TypeName}<Output>` with a `coerce(&self) -> &Output` method
-2. Implementations for each `#[coerce(borrowed = "...")]` target
+1. **For borrowed coercions**: A trait `Coerce{TypeName}<Output>` with a `coerce(&self) -> &Output` method
+2. **For owned coercions**: A trait `CoerceOwned{TypeName}<Output>` with an `into_coerced(self) -> Output` method
+3. Implementations for each target type specified in attributes
 
-### Generated Code
+### Generated Code (Borrowed)
 
-For the example above, the macro generates:
+For borrowed coercions:
 
 ```rust
 trait CoerceTypedPath<Output: ?Sized> {
@@ -89,12 +122,33 @@ impl<Base, Type> CoerceTypedPath<TypedPath<Relative, File>> for TypedPath<Base, 
 }
 ```
 
+### Generated Code (Owned)
+
+For owned coercions:
+
+```rust
+trait CoerceOwnedState<Output> {
+    fn into_coerced(self) -> Output;
+}
+
+impl<S> CoerceOwnedState<State<Final>> for State<S> {
+    fn into_coerced(self) -> State<Final> {
+        // Compile-time safety guard: ensure all fields are accounted for
+        let State { marker: _, data: _ } = &self;
+
+        // SAFETY: Types differ only in PhantomData type parameters.
+        // The destructuring pattern above ensures this at compile time.
+        unsafe { std::mem::transmute(self) }
+    }
+}
+```
+
 ## Safety Guarantees
 
 The macro includes multiple compile-time safety checks:
 
 1. **Field exhaustiveness**: Destructuring ensures all fields are accounted for. Adding or removing fields breaks compilation.
-2. **Type stability**: Type annotations ensure field types haven't changed.
+2. **Type stability** (borrowed only): Type annotations ensure field types haven't changed.
 3. **PhantomData-only changes**: Only types differing in `PhantomData` parameters can be coerced.
 4. **Documented safety**: Generated `SAFETY` comments explain why each transmute is sound.
 
@@ -112,16 +166,16 @@ cargo run --example typed_path
 
 ## Limitations
 
-- Currently only supports borrowed coercions (`&T -> &U`)
 - Requires named struct fields
 - Target types must be specified as literal strings in attributes
 
 ## Future Enhancements
 
-- Support for `#[coerce(owned = "...")]` for `Into` implementations
 - Support for `#[coerce(mutable = "...")]` for mutable references
+- Attribute to customize generated trait name
 - Tuple struct support
 - Better error messages with span information
+- Optional `AsRef`/`Into` integration via attribute
 
 ## License
 

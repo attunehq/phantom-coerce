@@ -1,9 +1,15 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_macro_input, Data, DeriveInput, Fields, GenericArgument, Ident,
+    parse_macro_input, Data, DeriveInput, Fields, Ident,
     PathArguments, Type, TypePath, Meta, Attribute,
 };
+
+#[derive(Debug, Clone)]
+enum CoercionKind {
+    Borrowed(String),
+    Owned(String),
+}
 
 #[proc_macro_derive(Coerce, attributes(coerce))]
 pub fn derive_coerce(input: TokenStream) -> TokenStream {
@@ -41,54 +47,100 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         }
     }
 
-    // Parse coerce attributes to extract target types
-    let mut coerce_targets = Vec::new();
+    // Parse coerce attributes to extract target types and kinds
+    let mut coercions = Vec::new();
     for attr in &input.attrs {
         if attr.path().is_ident("coerce") {
-            if let Some(target) = parse_coerce_attr(attr)? {
-                coerce_targets.push(target);
+            if let Some(coercion) = parse_coerce_attr(attr)? {
+                coercions.push(coercion);
             }
         }
     }
 
-    if coerce_targets.is_empty() {
+    if coercions.is_empty() {
         return Err(syn::Error::new_spanned(
             input,
-            "#[derive(Coerce)] requires at least one #[coerce(borrowed = \"...\")] attribute"
+            "#[derive(Coerce)] requires at least one #[coerce(...)] attribute"
         ));
     }
 
-    // Generate trait name
-    let trait_name = Ident::new(&format!("Coerce{}", struct_name), struct_name.span());
+    let mut output = proc_macro2::TokenStream::new();
 
-    // Generate trait definition
-    let trait_def = quote! {
-        trait #trait_name<Output: ?Sized> {
-            fn coerce(&self) -> &Output;
+    // Generate borrowed coercions
+    let borrowed_targets: Vec<_> = coercions.iter()
+        .filter_map(|c| match c {
+            CoercionKind::Borrowed(s) => Some(s.clone()),
+            _ => None,
+        })
+        .collect();
+
+    if !borrowed_targets.is_empty() {
+        let trait_name = Ident::new(&format!("Coerce{}", struct_name), struct_name.span());
+
+        let trait_def = quote! {
+            trait #trait_name<Output: ?Sized> {
+                fn coerce(&self) -> &Output;
+            }
+        };
+
+        let mut impls = Vec::new();
+        for target_str in &borrowed_targets {
+            let target_type: Type = syn::parse_str(target_str)?;
+            let impl_block = generate_borrowed_impl(
+                struct_name,
+                generics,
+                &trait_name,
+                &target_type,
+                fields,
+                &phantom_fields,
+            )?;
+            impls.push(impl_block);
         }
-    };
 
-    // Generate implementations for each target
-    let mut impls = Vec::new();
-    for target_str in &coerce_targets {
-        let target_type: Type = syn::parse_str(target_str)?;
-
-        let impl_block = generate_impl(
-            struct_name,
-            generics,
-            &trait_name,
-            &target_type,
-            fields,
-            &phantom_fields,
-        )?;
-
-        impls.push(impl_block);
+        output.extend(quote! {
+            #trait_def
+            #(#impls)*
+        });
     }
 
-    Ok(quote! {
-        #trait_def
-        #(#impls)*
-    })
+    // Generate owned coercions
+    let owned_targets: Vec<_> = coercions.iter()
+        .filter_map(|c| match c {
+            CoercionKind::Owned(s) => Some(s.clone()),
+            _ => None,
+        })
+        .collect();
+
+    if !owned_targets.is_empty() {
+        let trait_name = Ident::new(&format!("CoerceOwned{}", struct_name), struct_name.span());
+
+        let trait_def = quote! {
+            trait #trait_name<Output> {
+                fn into_coerced(self) -> Output;
+            }
+        };
+
+        let mut impls = Vec::new();
+        for target_str in &owned_targets {
+            let target_type: Type = syn::parse_str(target_str)?;
+            let impl_block = generate_owned_impl(
+                struct_name,
+                generics,
+                &trait_name,
+                &target_type,
+                fields,
+                &phantom_fields,
+            )?;
+            impls.push(impl_block);
+        }
+
+        output.extend(quote! {
+            #trait_def
+            #(#impls)*
+        });
+    }
+
+    Ok(output)
 }
 
 fn is_phantom_data(ty: &Type) -> bool {
@@ -100,7 +152,7 @@ fn is_phantom_data(ty: &Type) -> bool {
     false
 }
 
-fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<String>> {
+fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<CoercionKind>> {
     let Meta::List(meta_list) = &attr.meta else {
         return Ok(None);
     };
@@ -108,12 +160,16 @@ fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<String>> {
     let nested = meta_list.tokens.clone();
     let parsed: syn::MetaNameValue = syn::parse2(nested)?;
 
-    if !parsed.path.is_ident("borrowed") {
+    let kind = if parsed.path.is_ident("borrowed") {
+        CoercionKind::Borrowed
+    } else if parsed.path.is_ident("owned") {
+        CoercionKind::Owned
+    } else {
         return Err(syn::Error::new_spanned(
             &parsed.path,
-            "Expected 'borrowed' in #[coerce(borrowed = \"...\")]"
+            "Expected 'borrowed' or 'owned' in #[coerce(borrowed = \"...\")] or #[coerce(owned = \"...\")]"
         ));
-    }
+    };
 
     let syn::Expr::Lit(expr_lit) = &parsed.value else {
         return Err(syn::Error::new_spanned(
@@ -129,10 +185,10 @@ fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<String>> {
         ));
     };
 
-    Ok(Some(lit_str.value()))
+    Ok(Some(kind(lit_str.value())))
 }
 
-fn generate_impl(
+fn generate_borrowed_impl(
     struct_name: &Ident,
     generics: &syn::Generics,
     trait_name: &Ident,
@@ -140,7 +196,6 @@ fn generate_impl(
     fields: &syn::FieldsNamed,
     _phantom_fields: &[&Ident],
 ) -> syn::Result<proc_macro2::TokenStream> {
-    // Extract type arguments from target type
     let Type::Path(target_path) = target_type else {
         return Err(syn::Error::new_spanned(
             target_type,
@@ -149,28 +204,12 @@ fn generate_impl(
     };
 
     let target_segment = target_path.path.segments.last().unwrap();
-    let PathArguments::AngleBracketed(target_args) = &target_segment.arguments else {
+    let PathArguments::AngleBracketed(_target_args) = &target_segment.arguments else {
         return Err(syn::Error::new_spanned(
             target_type,
             "Coerce target must have type parameters"
         ));
     };
-
-    // Build safety comment documenting which fields differ
-    let mut changed_params = Vec::new();
-    let source_params: Vec<_> = generics.type_params().collect();
-    let target_params: Vec<_> = target_args.args.iter().collect();
-
-    for (_idx, (source_param, target_arg)) in source_params.iter().zip(target_params.iter()).enumerate() {
-        if let GenericArgument::Type(Type::Path(target_ty_path)) = target_arg {
-            let source_ident = &source_param.ident;
-            let target_ident = &target_ty_path.path.segments.last().unwrap().ident;
-
-            if source_ident != target_ident {
-                changed_params.push(format!("{} -> {}", source_ident, target_ident));
-            }
-        }
-    }
 
     // Generate destructuring pattern with type annotations for all fields
     let field_destructure: Vec<_> = fields.named.iter().map(|f| {
@@ -195,6 +234,51 @@ fn generate_impl(
 
                 // SAFETY: Types differ only in PhantomData type parameters.
                 // The destructuring pattern and type annotations above ensure this at compile time.
+                unsafe { std::mem::transmute(self) }
+            }
+        }
+    })
+}
+
+fn generate_owned_impl(
+    struct_name: &Ident,
+    generics: &syn::Generics,
+    trait_name: &Ident,
+    target_type: &Type,
+    fields: &syn::FieldsNamed,
+    _phantom_fields: &[&Ident],
+) -> syn::Result<proc_macro2::TokenStream> {
+    let Type::Path(target_path) = target_type else {
+        return Err(syn::Error::new_spanned(
+            target_type,
+            "Coerce target must be a type path"
+        ));
+    };
+
+    let target_segment = target_path.path.segments.last().unwrap();
+    let PathArguments::AngleBracketed(_target_args) = &target_segment.arguments else {
+        return Err(syn::Error::new_spanned(
+            target_type,
+            "Coerce target must have type parameters"
+        ));
+    };
+
+    // Generate destructuring pattern for all fields
+    let field_destructure: Vec<_> = fields.named.iter().map(|f| {
+        let field_name = f.ident.as_ref().unwrap();
+        quote! { #field_name: _ }
+    }).collect();
+
+    let (impl_generics, _, where_clause) = generics.split_for_impl();
+
+    Ok(quote! {
+        impl #impl_generics #trait_name<#target_type> for #struct_name #impl_generics #where_clause {
+            fn into_coerced(self) -> #target_type {
+                // Compile-time safety guard: ensure all fields are accounted for
+                let #struct_name { #(#field_destructure),* } = &self;
+
+                // SAFETY: Types differ only in PhantomData type parameters.
+                // The destructuring pattern above ensures this at compile time.
                 unsafe { std::mem::transmute(self) }
             }
         }

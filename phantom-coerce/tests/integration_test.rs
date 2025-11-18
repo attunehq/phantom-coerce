@@ -143,3 +143,93 @@ fn test_complex_coercion() {
     let coerced2: &Complex<OtherData, AnotherState> = complex2.coerce();
     assert_eq!(coerced2.get_data(), ("test2", 456));
 }
+
+// Test owned coercions
+#[derive(Coerce)]
+#[coerce(owned = "Owned<OtherOwned>")]
+#[coerce(borrowed = "Owned<OtherOwned>")]
+struct Owned<Marker> {
+    phantom: PhantomData<Marker>,
+    value: String,
+}
+
+struct OriginalOwned;
+struct OtherOwned;
+
+impl<M> Owned<M> {
+    fn new(value: String) -> Self {
+        Self {
+            phantom: PhantomData,
+            value,
+        }
+    }
+
+    fn get_value(&self) -> &str {
+        &self.value
+    }
+}
+
+#[test]
+fn test_owned_coercion() {
+    let owned = Owned::<OriginalOwned>::new("hello".to_string());
+
+    // Test owned coercion (consumes the original)
+    let coerced: Owned<OtherOwned> = owned.into_coerced();
+    assert_eq!(coerced.get_value(), "hello");
+}
+
+#[test]
+fn test_borrowed_vs_owned() {
+    let owned1 = Owned::<OriginalOwned>::new("borrowed".to_string());
+
+    // Can use borrowed coercion multiple times
+    let borrowed1: &Owned<OtherOwned> = owned1.coerce();
+    assert_eq!(borrowed1.get_value(), "borrowed");
+    let borrowed2: &Owned<OtherOwned> = owned1.coerce();
+    assert_eq!(borrowed2.get_value(), "borrowed");
+
+    // Now consume it with owned coercion
+    let owned_coerced: Owned<OtherOwned> = owned1.into_coerced();
+    assert_eq!(owned_coerced.get_value(), "borrowed");
+}
+
+// Test owned coercion with multiple parameters
+#[derive(Coerce)]
+#[coerce(owned = "MultiOwned<X, Y>")]
+#[coerce(owned = "MultiOwned<Y, X>")]
+struct MultiOwned<P1, P2> {
+    p1: PhantomData<P1>,
+    p2: PhantomData<P2>,
+    data: Vec<i32>,
+}
+
+struct X;
+struct Y;
+struct Z;
+
+impl<P1, P2> MultiOwned<P1, P2> {
+    fn new(data: Vec<i32>) -> Self {
+        Self {
+            p1: PhantomData,
+            p2: PhantomData,
+            data,
+        }
+    }
+
+    fn sum(&self) -> i32 {
+        self.data.iter().sum()
+    }
+}
+
+#[test]
+fn test_multi_owned_coercion() {
+    let multi = MultiOwned::<Z, Z>::new(vec![1, 2, 3, 4, 5]);
+
+    // Coerce to X, Y
+    let coerced: MultiOwned<X, Y> = multi.into_coerced();
+    assert_eq!(coerced.sum(), 15);
+
+    // Can chain owned coercions
+    let coerced2: MultiOwned<Y, X> = coerced.into_coerced();
+    assert_eq!(coerced2.sum(), 15);
+}

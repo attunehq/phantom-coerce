@@ -3,7 +3,9 @@
 //! This crate provides a `#[derive(Coerce)]` macro that generates safe coercion methods
 //! for types that differ only in their `PhantomData` type parameters.
 //!
-//! # Example
+//! # Borrowed Coercion
+//!
+//! Use `#[coerce(borrowed = "...")]` to generate borrowed coercions (`&T -> &U`):
 //!
 //! ```rust
 //! use std::marker::PhantomData;
@@ -17,12 +19,47 @@
 //! #[derive(Coerce)]
 //! #[coerce(borrowed = "TypedPath<SomeBase, File>")]
 //! #[coerce(borrowed = "TypedPath<Absolute, SomeType>")]
-//! #[coerce(borrowed = "TypedPath<SomeBase, SomeType>")]
 //! struct TypedPath<Base, Type> {
 //!     base: PhantomData<Base>,
 //!     ty: PhantomData<Type>,
 //!     path: std::path::PathBuf,
 //! }
+//!
+//! # fn main() {
+//! let path = TypedPath::<Absolute, File> {
+//!     base: PhantomData,
+//!     ty: PhantomData,
+//!     path: std::path::PathBuf::from("/test"),
+//! };
+//! let coerced: &TypedPath<SomeBase, File> = path.coerce();
+//! # }
+//! ```
+//!
+//! # Owned Coercion
+//!
+//! Use `#[coerce(owned = "...")]` to generate owned coercions (`T -> U`):
+//!
+//! ```rust
+//! use std::marker::PhantomData;
+//! use phantom_coerce::Coerce;
+//!
+//! # struct Initial;
+//! # struct Final;
+//! #
+//! #[derive(Coerce)]
+//! #[coerce(owned = "State<Final>")]
+//! struct State<S> {
+//!     marker: PhantomData<S>,
+//!     data: Vec<i32>,
+//! }
+//!
+//! # fn main() {
+//! let state = State::<Initial> {
+//!     marker: PhantomData,
+//!     data: vec![1, 2, 3],
+//! };
+//! let final_state: State<Final> = state.into_coerced();
+//! # }
 //! ```
 
 pub use phantom_coerce_derive::Coerce;
