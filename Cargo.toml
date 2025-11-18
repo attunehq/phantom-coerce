@@ -1,0 +1,3 @@
+[workspace]
+members = ["phantom-coerce", "phantom-coerce-derive"]
+resolver = "2"
