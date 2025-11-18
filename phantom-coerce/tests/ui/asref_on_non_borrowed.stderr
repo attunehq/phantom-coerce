@@ -1,0 +1,5 @@
+error: asref marker is only valid for borrowed coercions
+  --> tests/ui/asref_on_non_borrowed.rs:10:1
+   |
+10 | #[coerce(cloned = "BadAsRef<Marker2>", asref)]
+   | ^

@@ -61,6 +61,30 @@ fn main() {
 }
 ```
 
+#### Optional `AsRef` Integration
+
+Add the `asref` marker to also generate `AsRef` implementations:
+
+```rust
+#[derive(Coerce)]
+#[coerce(borrowed = "TypedPath<Relative, File>", asref)]
+struct TypedPath<Base, Type> {
+    base: PhantomData<Base>,
+    ty: PhantomData<Type>,
+    path: String,
+}
+
+fn takes_asref(path: &impl AsRef<TypedPath<Relative, File>>) {
+    let p: &TypedPath<Relative, File> = path.as_ref();
+    // Use p...
+}
+
+fn main() {
+    let path = TypedPath::<Absolute, File> { /* ... */ };
+    takes_asref(&path); // Works thanks to AsRef impl
+}
+```
+
 ### Owned Coercion
 
 Owned coercions allow you to convert `T` to `U`, consuming the original value:
@@ -203,6 +227,18 @@ where
 }
 ```
 
+### Generated Code (AsRef)
+
+When using the `asref` marker with borrowed coercions:
+
+```rust
+impl<Base, Type> AsRef<TypedPath<Relative, File>> for TypedPath<Base, Type> {
+    fn as_ref(&self) -> &TypedPath<Relative, File> {
+        self.coerce()
+    }
+}
+```
+
 ## Safety Guarantees
 
 The macro includes multiple compile-time safety checks:
@@ -216,7 +252,7 @@ The macro includes multiple compile-time safety checks:
 
 See the [`examples/`](examples/) directory:
 
-- [`typed_path.rs`](examples/typed_path.rs) - Complete example with typed filesystem paths
+- [`typed_path.rs`](examples/typed_path.rs) - Complete example with typed filesystem paths and AsRef integration
 
 Run with:
 
@@ -224,10 +260,28 @@ Run with:
 cargo run --example typed_path
 ```
 
+## Testing
+
+The crate includes comprehensive tests:
+
+- **Integration tests** (`tests/integration_test.rs`): 11 tests covering borrowed, owned, and cloned coercions
+- **Compile-fail tests** (`tests/ui/`): Demonstrates compile-time safety guarantees:
+  - `asref_on_non_borrowed.rs`: AsRef marker only works with borrowed coercions
+  - `missing_clone.rs`: Cloned coercion requires Clone trait
+  - `no_coerce_attrs.rs`: At least one coerce attribute required
+  - `on_enum.rs`: Derive only works on structs
+
+Run tests with:
+
+```bash
+cargo test --all
+```
+
 ## Limitations
 
 - Requires named struct fields
 - Target types must be specified as literal strings in attributes
+- Cannot generate `Into` impls due to conflicting blanket impl in `core` (use trait methods directly instead)
 
 ## Future Enhancements
 
@@ -235,16 +289,10 @@ cargo run --example typed_path
 - Attribute to customize generated trait name
 - Tuple struct support
 - Better error messages with span information
-- Optional `AsRef`/`Into` integration via attribute
 
 ## License
 
-Licensed under either of:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
-- MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
-
-at your option.
+Licensed under the Apache License, Version 2.0 ([LICENSE](LICENSE) or http://www.apache.org/licenses/LICENSE-2.0).
 
 ## Related Work
 

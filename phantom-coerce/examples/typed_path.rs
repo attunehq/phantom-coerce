@@ -20,7 +20,7 @@ struct UnknownType;
 
 /// A strongly-typed path that tracks both base type and content type
 #[derive(Debug, Coerce)]
-#[coerce(borrowed = "TypedPath<UnknownBase, File>")]
+#[coerce(borrowed = "TypedPath<UnknownBase, File>", asref)]
 #[coerce(borrowed = "TypedPath<Absolute, UnknownType>")]
 #[coerce(borrowed = "TypedPath<UnknownBase, UnknownType>")]
 struct TypedPath<Base, Type> {
@@ -70,6 +70,12 @@ fn print_any_path<Base, Type>(path: &TypedPath<Base, Type>) {
     println!("Path: {}", path.as_path().display());
 }
 
+// Example function using AsRef for ergonomic API design
+fn process_file_path(path: &impl AsRef<TypedPath<UnknownBase, File>>) {
+    let p: &TypedPath<UnknownBase, File> = path.as_ref();
+    println!("Processing file: {}", p.as_path().display());
+}
+
 fn main() {
     // Create a specific typed path
     let file_path = TypedPath::<Absolute, File>::new_absolute_file(
@@ -100,6 +106,11 @@ fn main() {
     print_any_path(coerced3);
     println!();
 
+    // Demonstrate AsRef integration
+    println!("Using AsRef integration:");
+    process_file_path(&file_path); // Works because of AsRef<TypedPath<UnknownBase, File>> impl
+    println!();
+
     // Create another path with different types
     let dir_path = TypedPath::<Relative, Directory>::new_relative_dir(
         PathBuf::from("./my_folder")
@@ -118,4 +129,5 @@ fn main() {
     println!("2. Flexibility: Can coerce specific types to more generic ones when needed");
     println!("3. Zero cost: All coercions are compile-time only, no runtime overhead");
     println!("4. Safety: Compile-time checks ensure coercions are valid");
+    println!("5. AsRef integration: Works seamlessly with APIs expecting AsRef<T>");
 }

@@ -2,7 +2,7 @@
 name = "phantom-coerce"
 version = "0.1.0"
 edition = "2021"
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0"
 description = "Safe, zero-cost coercion between types differing only in PhantomData parameters"
 repository = "https://github.com/yourusername/phantom-coerce"
 keywords = ["phantom", "coerce", "type-safety", "zero-cost"]
@@ -10,3 +10,6 @@ categories = ["rust-patterns", "no-std"]
 
 [dependencies]
 phantom-coerce-derive = { version = "0.1.0", path = "../phantom-coerce-derive" }
+
+[dev-dependencies]
+trybuild = "1.0"

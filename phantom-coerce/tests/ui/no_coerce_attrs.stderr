@@ -1,0 +1,8 @@
+error: #[derive(Coerce)] requires at least one #[coerce(...)] attribute
+  --> tests/ui/no_coerce_attrs.rs:9:1
+   |
+ 9 | / struct NoAttrs<M> {
+10 | |     phantom: PhantomData<M>,
+11 | |     value: i32,
+12 | | }
+   | |_^

@@ -1,0 +1,10 @@
+error: #[derive(Coerce)] can only be applied to structs
+  --> tests/ui/on_enum.rs:10:1
+   |
+10 | / #[coerce(borrowed = "BadEnum<Marker2>")]
+11 | | enum BadEnum<M> {
+12 | |     Variant {
+13 | |         phantom: PhantomData<M>,
+...  |
+16 | | }
+   | |_^
