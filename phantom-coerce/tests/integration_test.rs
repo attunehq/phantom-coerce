@@ -366,7 +366,7 @@ fn test_asref_integration() {
     assert_eq!(coerced.get_value(), 123);
 
     // Can also use turbofish syntax
-    let turbofish = test.coerce_ref::<AsRefTest<ToAsRef>>();
+    let turbofish = test.coerce::<AsRefTest<ToAsRef>>();
     assert_eq!(turbofish.get_value(), 123);
 }
 
@@ -374,17 +374,17 @@ fn test_asref_integration() {
 fn test_turbofish_syntax() {
     // Test borrowed with turbofish
     let path = TypedPath::<Absolute, File>::new("/test".to_string());
-    let coerced = path.coerce_ref::<TypedPath<SomeBase, File>>();
+    let coerced = path.coerce::<TypedPath<SomeBase, File>>();
     assert_eq!(coerced.as_str(), "/test");
 
     // Test owned with turbofish
     let owned = Owned::<OriginalOwned>::new("owned turbofish".to_string());
-    let coerced_owned = owned.into_coerced_ext::<Owned<OtherOwned>>();
+    let coerced_owned = owned.into_coerced::<Owned<OtherOwned>>();
     assert_eq!(coerced_owned.get_value(), "owned turbofish");
 
     // Test cloned with turbofish
     let cloned = Cloned::<ClonedMarker1>::new("turbofish".to_string());
-    let coerced_cloned = cloned.to_coerced_ext::<Cloned<OtherMarker>>();
+    let coerced_cloned = cloned.to_coerced::<Cloned<OtherMarker>>();
     assert_eq!(coerced_cloned.get_value(), "turbofish");
 }
 
