@@ -3,13 +3,21 @@ use quote::quote;
 use syn::{
     parse_macro_input, Data, DeriveInput, Fields, Ident,
     PathArguments, Type, TypePath, Meta, Attribute,
+    parse::Parser, spanned::Spanned,
 };
 
 #[derive(Debug, Clone)]
-enum CoercionKind {
-    Borrowed(String),
-    Owned(String),
-    Cloned(String),
+struct CoercionTarget {
+    target_type: String,
+    kind: CoercionMode,
+    generate_asref: bool,  // for borrowed only
+}
+
+#[derive(Debug, Clone, PartialEq)]
+enum CoercionMode {
+    Borrowed,
+    Owned,
+    Cloned,
 }
 
 #[proc_macro_derive(Coerce, attributes(coerce))]
@@ -69,10 +77,7 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
     // Generate borrowed coercions
     let borrowed_targets: Vec<_> = coercions.iter()
-        .filter_map(|c| match c {
-            CoercionKind::Borrowed(s) => Some(s.clone()),
-            _ => None,
-        })
+        .filter(|c| c.kind == CoercionMode::Borrowed)
         .collect();
 
     if !borrowed_targets.is_empty() {
@@ -85,8 +90,10 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         };
 
         let mut impls = Vec::new();
-        for target_str in &borrowed_targets {
-            let target_type: Type = syn::parse_str(target_str)?;
+        let mut asref_impls = Vec::new();
+
+        for target in &borrowed_targets {
+            let target_type: Type = syn::parse_str(&target.target_type)?;
             let impl_block = generate_borrowed_impl(
                 struct_name,
                 generics,
@@ -96,20 +103,29 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
                 &phantom_fields,
             )?;
             impls.push(impl_block);
+
+            // Generate AsRef impl if requested
+            if target.generate_asref {
+                let asref_impl = generate_asref_impl(
+                    struct_name,
+                    generics,
+                    &trait_name,
+                    &target_type,
+                )?;
+                asref_impls.push(asref_impl);
+            }
         }
 
         output.extend(quote! {
             #trait_def
             #(#impls)*
+            #(#asref_impls)*
         });
     }
 
     // Generate owned coercions
     let owned_targets: Vec<_> = coercions.iter()
-        .filter_map(|c| match c {
-            CoercionKind::Owned(s) => Some(s.clone()),
-            _ => None,
-        })
+        .filter(|c| c.kind == CoercionMode::Owned)
         .collect();
 
     if !owned_targets.is_empty() {
@@ -122,8 +138,9 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         };
 
         let mut impls = Vec::new();
-        for target_str in &owned_targets {
-            let target_type: Type = syn::parse_str(target_str)?;
+
+        for target in &owned_targets {
+            let target_type: Type = syn::parse_str(&target.target_type)?;
             let impl_block = generate_owned_impl(
                 struct_name,
                 generics,
@@ -143,10 +160,7 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
     // Generate cloned coercions
     let cloned_targets: Vec<_> = coercions.iter()
-        .filter_map(|c| match c {
-            CoercionKind::Cloned(s) => Some(s.clone()),
-            _ => None,
-        })
+        .filter(|c| c.kind == CoercionMode::Cloned)
         .collect();
 
     if !cloned_targets.is_empty() {
@@ -159,8 +173,9 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
         };
 
         let mut impls = Vec::new();
-        for target_str in &cloned_targets {
-            let target_type: Type = syn::parse_str(target_str)?;
+
+        for target in &cloned_targets {
+            let target_type: Type = syn::parse_str(&target.target_type)?;
             let impl_block = generate_cloned_impl(
                 struct_name,
                 generics,
@@ -190,42 +205,99 @@ fn is_phantom_data(ty: &Type) -> bool {
     false
 }
 
-fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<CoercionKind>> {
+fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<CoercionTarget>> {
     let Meta::List(meta_list) = &attr.meta else {
         return Ok(None);
     };
 
     let nested = meta_list.tokens.clone();
-    let parsed: syn::MetaNameValue = syn::parse2(nested)?;
 
-    let kind = if parsed.path.is_ident("borrowed") {
-        CoercionKind::Borrowed
-    } else if parsed.path.is_ident("owned") {
-        CoercionKind::Owned
-    } else if parsed.path.is_ident("cloned") {
-        CoercionKind::Cloned
-    } else {
-        return Err(syn::Error::new_spanned(
-            &parsed.path,
-            "Expected 'borrowed', 'owned', or 'cloned' in #[coerce(...)]"
+    // Parse as multiple Meta items (NameValue or Path)
+    let parser = syn::punctuated::Punctuated::<syn::Meta, syn::Token![,]>::parse_terminated;
+    let metas = parser.parse2(nested)?;
+
+    let mut mode: Option<CoercionMode> = None;
+    let mut target_type: Option<String> = None;
+    let mut has_asref = false;
+
+    for meta in metas {
+        match meta {
+            syn::Meta::NameValue(nv) => {
+                if nv.path.is_ident("borrowed") {
+                    mode = Some(CoercionMode::Borrowed);
+                } else if nv.path.is_ident("owned") {
+                    mode = Some(CoercionMode::Owned);
+                } else if nv.path.is_ident("cloned") {
+                    mode = Some(CoercionMode::Cloned);
+                } else {
+                    return Err(syn::Error::new_spanned(
+                        &nv.path,
+                        "Expected 'borrowed', 'owned', or 'cloned'"
+                    ));
+                }
+
+                let syn::Expr::Lit(expr_lit) = &nv.value else {
+                    return Err(syn::Error::new_spanned(
+                        &nv.value,
+                        "Expected string literal"
+                    ));
+                };
+
+                let syn::Lit::Str(lit_str) = &expr_lit.lit else {
+                    return Err(syn::Error::new_spanned(
+                        &expr_lit.lit,
+                        "Expected string literal"
+                    ));
+                };
+
+                target_type = Some(lit_str.value());
+            }
+            syn::Meta::Path(path) => {
+                if path.is_ident("asref") {
+                    has_asref = true;
+                } else {
+                    return Err(syn::Error::new_spanned(
+                        &path,
+                        "Expected 'asref' marker (only valid for borrowed coercions)"
+                    ));
+                }
+            }
+            _ => {
+                return Err(syn::Error::new_spanned(
+                    &meta,
+                    "Expected name-value pair or path"
+                ));
+            }
+        }
+    }
+
+    let mode = mode.ok_or_else(|| {
+        syn::Error::new(
+            attr.span(),
+            "Missing coercion mode: borrowed, owned, or cloned"
+        )
+    })?;
+
+    let target_type = target_type.ok_or_else(|| {
+        syn::Error::new(
+            attr.span(),
+            "Missing target type in coercion attribute"
+        )
+    })?;
+
+    // Validate asref is only used with borrowed
+    if has_asref && mode != CoercionMode::Borrowed {
+        return Err(syn::Error::new(
+            attr.span(),
+            "asref marker is only valid for borrowed coercions"
         ));
-    };
+    }
 
-    let syn::Expr::Lit(expr_lit) = &parsed.value else {
-        return Err(syn::Error::new_spanned(
-            &parsed.value,
-            "Expected string literal"
-        ));
-    };
-
-    let syn::Lit::Str(lit_str) = &expr_lit.lit else {
-        return Err(syn::Error::new_spanned(
-            &expr_lit.lit,
-            "Expected string literal"
-        ));
-    };
-
-    Ok(Some(kind(lit_str.value())))
+    Ok(Some(CoercionTarget {
+        target_type,
+        kind: mode,
+        generate_asref: has_asref,
+    }))
 }
 
 fn generate_borrowed_impl(
@@ -380,3 +452,21 @@ fn generate_cloned_impl(
         }
     })
 }
+
+fn generate_asref_impl(
+    struct_name: &Ident,
+    generics: &syn::Generics,
+    _trait_name: &Ident,
+    target_type: &Type,
+) -> syn::Result<proc_macro2::TokenStream> {
+    let (impl_generics, _, where_clause) = generics.split_for_impl();
+
+    Ok(quote! {
+        impl #impl_generics AsRef<#target_type> for #struct_name #impl_generics #where_clause {
+            fn as_ref(&self) -> &#target_type {
+                self.coerce()
+            }
+        }
+    })
+}
+

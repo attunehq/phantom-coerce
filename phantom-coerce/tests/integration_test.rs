@@ -339,3 +339,43 @@ fn test_complex_cloned_coercion() {
     assert_eq!(coerced2.get_count(), 42);
     assert_eq!(coerced2.get_data_len(), 3);
 }
+
+// Test AsRef integration with borrowed coercion
+#[derive(Clone)]
+struct WithAsRef;
+#[derive(Clone)]
+struct ToAsRef;
+
+#[derive(Coerce)]
+#[coerce(borrowed = "AsRefTest<ToAsRef>", asref)]
+struct AsRefTest<M> {
+    marker: PhantomData<M>,
+    value: i32,
+}
+
+impl<M> AsRefTest<M> {
+    fn new(value: i32) -> Self {
+        Self {
+            marker: PhantomData,
+            value,
+        }
+    }
+
+    fn get_value(&self) -> i32 {
+        self.value
+    }
+}
+
+#[test]
+fn test_asref_integration() {
+    let test = AsRefTest::<WithAsRef>::new(123);
+
+    // Can use AsRef
+    let as_ref: &AsRefTest<ToAsRef> = test.as_ref();
+    assert_eq!(as_ref.get_value(), 123);
+
+    // AsRef uses coerce internally
+    let coerced: &AsRefTest<ToAsRef> = test.coerce();
+    assert_eq!(coerced.get_value(), 123);
+}
+
