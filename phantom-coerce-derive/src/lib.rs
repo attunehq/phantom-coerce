@@ -46,34 +46,46 @@ enum CoercionMode {
 /// use std::marker::PhantomData;
 /// use phantom_coerce::Coerce;
 ///
-/// struct State1;
-/// struct State2;
+/// // Type markers for compile-time tracking
+/// struct Absolute;
+/// struct Relative;
+/// struct File;
+/// struct AnyType;
 ///
 /// #[derive(Coerce, Clone)]
-/// #[coerce(borrowed = "Machine<State2>", asref)]
-/// #[coerce(owned = "Machine<State2>")]
-/// #[coerce(cloned = "Machine<State2>")]
-/// struct Machine<S> {
-///     state: PhantomData<S>,
-///     data: Vec<i32>,
+/// #[coerce(borrowed = "TypedPath<Relative, File>", asref)]
+/// #[coerce(owned = "TypedPath<Relative, AnyType>")]
+/// #[coerce(cloned = "TypedPath<Absolute, AnyType>")]
+/// struct TypedPath<Base, Type> {
+///     base: PhantomData<Base>,
+///     ty: PhantomData<Type>,
+///     path: String,
 /// }
 ///
 /// fn main() {
-///     let m = Machine::<State1> { state: PhantomData, data: vec![1, 2, 3] };
+///     let path = TypedPath::<Absolute, File> {
+///         base: PhantomData,
+///         ty: PhantomData,
+///         path: "/home/user/file.txt".to_string(),
+///     };
 ///
 ///     // Borrowed: both inference and turbofish work
-///     let r1: &Machine<State2> = m.coerce();
-///     let r2 = m.coerce::<Machine<State2>>();
+///     let r1: &TypedPath<Relative, File> = path.coerce();
+///     let r2 = path.coerce::<TypedPath<Relative, File>>();
 ///
 ///     // AsRef (when marker is present)
-///     let r3: &Machine<State2> = m.as_ref();
+///     let r3: &TypedPath<Relative, File> = path.as_ref();
 ///
-///     // Owned (consumes m)
-///     let m2 = Machine::<State1> { state: PhantomData, data: vec![4, 5] };
-///     let owned: Machine<State2> = m2.into_coerced();
+///     // Owned (consumes path)
+///     let path2 = TypedPath::<Absolute, File> {
+///         base: PhantomData,
+///         ty: PhantomData,
+///         path: "/test".to_string(),
+///     };
+///     let owned: TypedPath<Relative, AnyType> = path2.into_coerced();
 ///
-///     // Cloned (m remains usable)
-///     let cloned = m.to_coerced::<Machine<State2>>();
+///     // Cloned (path remains usable)
+///     let cloned = path.to_coerced::<TypedPath<Absolute, AnyType>>();
 /// }
 /// ```
 #[proc_macro_derive(Coerce, attributes(coerce))]
