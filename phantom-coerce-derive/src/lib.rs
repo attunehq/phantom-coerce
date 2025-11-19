@@ -697,12 +697,9 @@ fn extract_string_value(nv: &syn::MetaNameValue) -> syn::Result<String> {
     Ok(lit_str.value())
 }
 
-/// Split a string by `|` but only at top level (not inside angle brackets)
-/// Example: "TypedPath<Absolute | Relative, _>" should be treated as one item (not split)
-/// Example: "TypedPath<Absolute, _> | TypedPath<Relative, _>" splits into two items
-/// But actually the INTENDED syntax is "Absolute | Relative" INSIDE the brackets
-/// So "TypedPath<Absolute | Relative, _>" should split the type parameter position
-fn split_by_pipe_respecting_brackets(s: &str) -> Vec<String> {
+/// Split a string by top-level `|` only (not inside angle brackets)
+/// Returns vec with single element if no top-level pipes found
+fn split_top_level_pipes(s: &str) -> Vec<String> {
     let mut result = Vec::new();
     let mut current = String::new();
     let mut depth = 0;
@@ -717,14 +714,8 @@ fn split_by_pipe_respecting_brackets(s: &str) -> Vec<String> {
                 depth -= 1;
                 current.push(ch);
             }
-            '|' if depth > 0 => {
-                // Pipe inside brackets - this is for type alternatives
-                // We need to expand this differently
-                // For now, store the pipe
-                current.push(ch);
-            }
             '|' if depth == 0 => {
-                // Top-level pipe, split here
+                // Top-level pipe
                 if !current.trim().is_empty() {
                     result.push(current.trim().to_string());
                     current.clear();
@@ -740,18 +731,32 @@ fn split_by_pipe_respecting_brackets(s: &str) -> Vec<String> {
         result.push(current.trim().to_string());
     }
 
-    // If no top-level splits found but there are pipes inside brackets,
-    // we need to expand those
-    if result.len() <= 1 && s.contains('|') {
-        // Parse and expand type parameter alternatives
-        return expand_type_parameter_alternatives(s);
-    }
-
     if result.is_empty() {
         vec![s.to_string()]
     } else {
         result
     }
+}
+
+/// Split a string by `|` at both top-level and parameter-level
+/// Handles nested alternatives like "Type<A | B> | Type<C | D>"
+///
+/// This is a two-stage pipeline:
+/// 1. Split by top-level pipes (outside angle brackets)
+/// 2. For each top-level alternative, expand parameter-level pipes (inside angle brackets)
+/// 3. Flatten the results
+fn split_by_pipe_respecting_brackets(s: &str) -> Vec<String> {
+    // Step 1: Split by top-level pipes (outside angle brackets)
+    let top_level_alternatives = split_top_level_pipes(s);
+
+    // Step 2: For each top-level alternative, expand parameter-level pipes
+    let mut result = Vec::new();
+    for alternative in top_level_alternatives {
+        let expanded = expand_type_parameter_alternatives(&alternative);
+        result.extend(expanded);
+    }
+
+    result
 }
 
 /// Expand type parameter alternatives like "TypedPath<Absolute | Relative, _>"
