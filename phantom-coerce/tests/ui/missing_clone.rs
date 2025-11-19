@@ -8,7 +8,7 @@ struct Marker2;
 
 // Missing #[derive(Clone)]
 #[derive(Coerce)]
-#[coerce(cloned = "NoClone<Marker2>")]
+#[coerce(cloned_from = "NoClone<Marker1>", cloned_to = "NoClone<Marker2>")]
 struct NoClone<M> {
     phantom: PhantomData<M>,
     value: String,

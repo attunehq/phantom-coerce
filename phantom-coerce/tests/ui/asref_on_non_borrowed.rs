@@ -7,7 +7,7 @@ struct Marker1;
 struct Marker2;
 
 #[derive(Coerce, Clone)]
-#[coerce(cloned = "BadAsRef<Marker2>", asref)]
+#[coerce(cloned_from = "BadAsRef<Marker1>", cloned_to = "BadAsRef<Marker2>", asref)]
 struct BadAsRef<M> {
     phantom: PhantomData<M>,
     value: String,

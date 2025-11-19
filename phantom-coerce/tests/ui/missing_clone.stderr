@@ -1,18 +1,29 @@
+error[E0277]: the trait bound `NoClone<Marker1>: Clone` is not satisfied
+  --> tests/ui/missing_clone.rs:10:10
+   |
+10 | #[derive(Coerce)]
+   |          ^^^^^^ the trait `Clone` is not implemented for `NoClone<Marker1>`
+   |
+   = help: see issue #48214
+   = note: this error originates in the derive macro `Coerce` (in Nightly builds, run with -Z macro-backtrace for more info)
+help: consider annotating `NoClone<Marker1>` with `#[derive(Clone)]`
+   |
+12 + #[derive(Clone)]
+13 | struct NoClone<M> {
+   |
+
 error[E0277]: the trait bound `NoClone<Marker1>: CoerceClonedNoClone<NoClone<Marker2>>` is not satisfied
   --> tests/ui/missing_clone.rs:23:40
    |
 23 |     let _: NoClone<Marker2> = no_clone.to_coerced();
    |                                        ^^^^^^^^^^ the trait `Clone` is not implemented for `NoClone<Marker1>`
    |
-   = help: the trait `CoerceClonedNoClone<NoClone<Marker2>>` is implemented for `NoClone<M>`
+   = help: the trait `CoerceClonedNoClone<NoClone<Marker2>>` is implemented for `NoClone<Marker1>`
 note: required for `NoClone<Marker1>` to implement `CoerceClonedNoClone<NoClone<Marker2>>`
   --> tests/ui/missing_clone.rs:10:10
    |
 10 | #[derive(Coerce)]
    |          ^^^^^^ unsatisfied trait bound introduced in this `derive` macro
-11 | #[coerce(cloned = "NoClone<Marker2>")]
-12 | struct NoClone<M> {
-   |        ^^^^^^^^^^
 note: required by a bound in `NoClone::<M>::to_coerced`
   --> tests/ui/missing_clone.rs:10:10
    |

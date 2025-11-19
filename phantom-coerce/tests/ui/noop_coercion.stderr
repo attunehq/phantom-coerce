@@ -1,0 +1,5 @@
+error: No-op coercion detected: coercing from 'Container<TypeA>' to 'Container<TypeA>' (same type). This coercion has no effect and should be removed.
+ --> tests/ui/noop_coercion.rs:9:1
+  |
+9 | #[coerce(borrowed_from = "Container<TypeA>", borrowed_to = "Container<TypeA>")]
+  | ^

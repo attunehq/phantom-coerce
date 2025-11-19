@@ -26,9 +26,18 @@ struct Low;
 struct AnyPriority; // Generic priority
 
 #[derive(Coerce, Clone, Debug)]
-#[coerce(cloned = "Message<AnyFormat, High>")]
-#[coerce(cloned = "Message<Json, AnyPriority>")]
-#[coerce(cloned = "Message<AnyFormat, AnyPriority>")]
+#[coerce(
+    cloned_from = "Message<Json | Xml | Protobuf, High>",
+    cloned_to = "Message<AnyFormat, High>"
+)]
+#[coerce(
+    cloned_from = "Message<Json, High | Normal | Low>",
+    cloned_to = "Message<Json, AnyPriority>"
+)]
+#[coerce(
+    cloned_from = "Message<Json | Xml | Protobuf, High | Normal | Low>",
+    cloned_to = "Message<AnyFormat, AnyPriority>"
+)]
 struct Message<Format, Priority> {
     format: PhantomData<Format>,
     priority: PhantomData<Priority>,
@@ -99,7 +108,11 @@ fn archive_message(msg: Message<AnyFormat, AnyPriority>) {
 
 // High-priority message logger (only for high priority, any format)
 fn log_high_priority<Format>(msg: &Message<Format, High>) {
-    println!("  ⚠️  HIGH PRIORITY message {}: {}", msg.id(), msg.content());
+    println!(
+        "  ⚠️  HIGH PRIORITY message {}: {}",
+        msg.id(),
+        msg.content()
+    );
 }
 
 // JSON-specific processor (only JSON, any priority)
@@ -119,9 +132,11 @@ fn main() {
     println!("=== Message Format Handling with Cloned Coercion ===\n");
 
     // Create messages with different formats and priorities
-    let json_high = Message::<Json, High>::new_json_high(1, r#"{"event": "user_login"}"#.to_string());
+    let json_high =
+        Message::<Json, High>::new_json_high(1, r#"{"event": "user_login"}"#.to_string());
 
-    let xml_normal = Message::<Xml, Normal>::new_xml_normal(2, "<event>data_sync</event>".to_string());
+    let xml_normal =
+        Message::<Xml, Normal>::new_xml_normal(2, "<event>data_sync</event>".to_string());
 
     let proto_low = Message::<Protobuf, Low>::new_protobuf_low(3, "binary_data_here".to_string());
 
@@ -137,7 +152,10 @@ fn main() {
     log_high_priority(&high_pri_generic);
 
     // The original json_high is still usable!
-    println!("  ✓ Original JSON message still accessible: id={}", json_high.id());
+    println!(
+        "  ✓ Original JSON message still accessible: id={}",
+        json_high.id()
+    );
 
     println!();
 
@@ -165,7 +183,10 @@ fn main() {
 
     // Coerce only the priority to generic, keeping JSON format
     let json_any_priority: Message<Json, AnyPriority> = json_high.to_coerced();
-    println!("  • JSON message with any priority: id={}", json_any_priority.id());
+    println!(
+        "  • JSON message with any priority: id={}",
+        json_any_priority.id()
+    );
 
     println!("\n=== Key Takeaway ===");
     println!("Cloned coercion allows non-destructive conversion of strongly-typed");

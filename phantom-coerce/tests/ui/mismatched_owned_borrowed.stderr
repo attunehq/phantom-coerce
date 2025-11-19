@@ -1,0 +1,5 @@
+error: Mismatched coercion modes: from side uses Owned but to side uses Borrowed. Both sides must use the same mode (e.g., borrowed_from with borrowed_to)
+  --> tests/ui/mismatched_owned_borrowed.rs:10:1
+   |
+10 | #[coerce(owned_from = "Container<TypeA>", borrowed_to = "Container<Generic>")]
+   | ^

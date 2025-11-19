@@ -1,0 +1,16 @@
+error[E0599]: no method named `coerce` found for struct `DifferentContainer<T>` in the current scope
+  --> tests/ui/coerce_completely_unlisted_type.rs:30:51
+   |
+18 | struct DifferentContainer<T> {
+   | ---------------------------- method `coerce` not found for this struct
+...
+30 |     let _coerced: &Container<Generic> = different.coerce();
+   |                                                   ^^^^^^ method not found in `DifferentContainer<TypeA>`
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+note: `CoerceRefContainer` defines an item `coerce`, perhaps you need to implement it
+  --> tests/ui/coerce_completely_unlisted_type.rs:10:10
+   |
+10 | #[derive(Coerce)]
+   |          ^^^^^^
+   = note: this error originates in the derive macro `Coerce` (in Nightly builds, run with -Z macro-backtrace for more info)

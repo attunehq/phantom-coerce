@@ -1,0 +1,15 @@
+error[E0277]: the trait bound `Container<C, X>: CoerceRefContainer<_>` is not satisfied
+  --> tests/ui/coerce_unlisted_with_type_hole.rs:28:48
+   |
+28 |     let _coerced: &Container<B, X> = container.coerce();
+   |                                                ^^^^^^ unsatisfied trait bound
+   |
+   = help: the trait `CoerceRefContainer<_>` is not implemented for `Container<C, X>`
+           but trait `CoerceRefContainer<Container<B, _>>` is implemented for `Container<A, _>`
+   = help: for that trait implementation, expected `A`, found `C`
+note: required by a bound in `Container::<T1, T2>::coerce`
+  --> tests/ui/coerce_unlisted_with_type_hole.rs:12:10
+   |
+12 | #[derive(Coerce)]
+   |          ^^^^^^ required by this bound in `Container::<T1, T2>::coerce`
+   = note: this error originates in the derive macro `Coerce` (in Nightly builds, run with -Z macro-backtrace for more info)

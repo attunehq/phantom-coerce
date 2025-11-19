@@ -1,0 +1,5 @@
+error: Missing source types: at least one 'borrowed_from', 'owned_from', or 'cloned_from' required
+  --> tests/ui/missing_from_attribute.rs:10:1
+   |
+10 | #[coerce(borrowed_to = "Container<TypeB>")]
+   | ^

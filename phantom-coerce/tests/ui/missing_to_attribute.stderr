@@ -1,0 +1,5 @@
+error: Missing target type: 'borrowed_to', 'owned_to', or 'cloned_to' required
+  --> tests/ui/missing_to_attribute.rs:10:1
+   |
+10 | #[coerce(borrowed_from = "Container<TypeA>")]
+   | ^

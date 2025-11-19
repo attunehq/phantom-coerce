@@ -1,0 +1,5 @@
+error: borrowed_from cannot be empty
+ --> tests/ui/empty_from_pattern.rs:9:10
+  |
+9 | #[coerce(borrowed_from = "", borrowed_to = "Container<Generic>")]
+  |          ^^^^^^^^^^^^^^^^^^

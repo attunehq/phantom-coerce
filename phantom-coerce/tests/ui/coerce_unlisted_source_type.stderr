@@ -1,0 +1,20 @@
+error[E0277]: the trait bound `Container<TypeC>: CoerceRefContainer<_>` is not satisfied
+  --> tests/ui/coerce_unlisted_source_type.rs:25:53
+   |
+25 |     let _coerced: &Container<Generic> = container_c.coerce();
+   |                                                     ^^^^^^ unsatisfied trait bound
+   |
+help: the trait `CoerceRefContainer<_>` is not implemented for `Container<TypeC>`
+  --> tests/ui/coerce_unlisted_source_type.rs:13:1
+   |
+13 | struct Container<T> {
+   | ^^^^^^^^^^^^^^^^^^^
+   = help: the following other types implement trait `CoerceRefContainer<Output>`:
+             Container<TypeA>
+             Container<TypeB>
+note: required by a bound in `Container::<T>::coerce`
+  --> tests/ui/coerce_unlisted_source_type.rs:11:10
+   |
+11 | #[derive(Coerce)]
+   |          ^^^^^^ required by this bound in `Container::<T>::coerce`
+   = note: this error originates in the derive macro `Coerce` (in Nightly builds, run with -Z macro-backtrace for more info)

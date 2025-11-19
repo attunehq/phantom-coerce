@@ -1,0 +1,5 @@
+error: Mismatched coercion modes: from side uses Borrowed but to side uses Cloned. Both sides must use the same mode (e.g., borrowed_from with borrowed_to)
+  --> tests/ui/mismatched_from_to_modes.rs:10:1
+   |
+10 | #[coerce(borrowed_from = "Container<TypeA>", cloned_to = "Container<Generic>")]
+   | ^

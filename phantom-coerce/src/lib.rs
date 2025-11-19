@@ -5,20 +5,21 @@
 //!
 //! # Borrowed Coercion
 //!
-//! Use `#[coerce(borrowed = "...")]` to generate borrowed coercions (`&T -> &U`):
+//! Use `#[coerce(borrowed_from = "...", borrowed_to = "...")]` to generate borrowed coercions (`&T -> &U`):
 //!
 //! ```rust
 //! use std::marker::PhantomData;
 //! use phantom_coerce::Coerce;
 //!
 //! # struct Absolute;
-//! # struct UnknownBase;  // Generic (subsumes Absolute)
+//! # struct Relative;
+//! # struct UnknownBase;  // Generic (subsumes Absolute, Relative)
 //! # struct File;
 //! # struct UnknownType;  // Generic (subsumes File)
 //! #
 //! #[derive(Coerce)]
-//! #[coerce(borrowed = "TypedPath<UnknownBase, File>")]
-//! #[coerce(borrowed = "TypedPath<Absolute, UnknownType>")]
+//! #[coerce(borrowed_from = "TypedPath<Absolute | Relative, File>", borrowed_to = "TypedPath<UnknownBase, File>")]
+//! #[coerce(borrowed_from = "TypedPath<Absolute, File>", borrowed_to = "TypedPath<Absolute, UnknownType>")]
 //! struct TypedPath<Base, Type> {
 //!     base: PhantomData<Base>,
 //!     ty: PhantomData<Type>,
@@ -47,11 +48,12 @@
 //! use phantom_coerce::Coerce;
 //!
 //! # struct Absolute;
-//! # struct UnknownBase;  // Generic (subsumes Absolute)
+//! # struct Relative;
+//! # struct UnknownBase;  // Generic (subsumes Absolute, Relative)
 //! # struct File;
 //! #
 //! #[derive(Coerce)]
-//! #[coerce(borrowed = "TypedPath<UnknownBase, File>", asref)]
+//! #[coerce(borrowed_from = "TypedPath<Absolute | Relative, File>", borrowed_to = "TypedPath<UnknownBase, File>", asref)]
 //! struct TypedPath<Base, Type> {
 //!     base: PhantomData<Base>,
 //!     ty: PhantomData<Type>,
@@ -75,17 +77,18 @@
 //!
 //! # Owned Coercion
 //!
-//! Use `#[coerce(owned = "...")]` to generate owned coercions (`T -> U`):
+//! Use `#[coerce(owned_from = "...", owned_to = "...")]` to generate owned coercions (`T -> U`):
 //!
 //! ```rust
 //! use std::marker::PhantomData;
 //! use phantom_coerce::Coerce;
 //!
 //! # struct Validated;
-//! # struct AnyStatus;  // Generic (subsumes Validated)
+//! # struct Unvalidated;
+//! # struct AnyStatus;  // Generic (subsumes Validated, Unvalidated)
 //! #
 //! #[derive(Coerce)]
-//! #[coerce(owned = "Request<AnyStatus>")]
+//! #[coerce(owned_from = "Request<Validated | Unvalidated>", owned_to = "Request<AnyStatus>")]
 //! struct Request<Status> {
 //!     marker: PhantomData<Status>,
 //!     url: String,
@@ -103,7 +106,7 @@
 //!
 //! # Cloned Coercion
 //!
-//! Use `#[coerce(cloned = "...")]` to generate cloned coercions (`&T -> U`), requiring `Clone`:
+//! Use `#[coerce(cloned_from = "...", cloned_to = "...")]` to generate cloned coercions (`&T -> U`), requiring `Clone`:
 //!
 //! ```rust
 //! use std::marker::PhantomData;
@@ -112,10 +115,12 @@
 //! # #[derive(Clone)]
 //! # struct Json;
 //! # #[derive(Clone)]
+//! # struct Xml;
+//! # #[derive(Clone)]
 //! # struct AnyFormat;  // Generic format (subsumes Json, Xml, etc.)
 //! #
 //! #[derive(Coerce, Clone)]
-//! #[coerce(cloned = "Message<AnyFormat>")]
+//! #[coerce(cloned_from = "Message<Json | Xml>", cloned_to = "Message<AnyFormat>")]
 //! struct Message<Format> {
 //!     marker: PhantomData<Format>,
 //!     content: String,

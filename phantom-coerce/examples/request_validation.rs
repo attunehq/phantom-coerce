@@ -17,9 +17,18 @@ struct POST;
 struct AnyMethod; // Generic method
 
 #[derive(Coerce, Debug)]
-#[coerce(owned = "Request<AnyStatus, GET>")]
-#[coerce(owned = "Request<FullyValidated, AnyMethod>")]
-#[coerce(owned = "Request<AnyStatus, AnyMethod>")]
+#[coerce(
+    owned_from = "Request<HeadersValidated | FullyValidated, GET>",
+    owned_to = "Request<AnyStatus, GET>"
+)]
+#[coerce(
+    owned_from = "Request<FullyValidated, GET | POST>",
+    owned_to = "Request<FullyValidated, AnyMethod>"
+)]
+#[coerce(
+    owned_from = "Request<HeadersValidated | FullyValidated, GET | POST>",
+    owned_to = "Request<AnyStatus, AnyMethod>"
+)]
 struct Request<Status, Method> {
     status: PhantomData<Status>,
     method: PhantomData<Method>,
@@ -129,10 +138,12 @@ fn main() {
 
     // Create and validate a POST request
     println!("--- POST Request ---");
-    let post_req =
-        Request::<Unvalidated, POST>::new_post("https://api.example.com/users".to_string(), b"user data".to_vec())
-            .add_header("Authorization".to_string(), "Bearer token456".to_string())
-            .add_header("Content-Type".to_string(), "application/json".to_string());
+    let post_req = Request::<Unvalidated, POST>::new_post(
+        "https://api.example.com/users".to_string(),
+        b"user data".to_vec(),
+    )
+    .add_header("Authorization".to_string(), "Bearer token456".to_string())
+    .add_header("Content-Type".to_string(), "application/json".to_string());
 
     match post_req.validate_headers() {
         Ok(req) => match req.validate_url() {
@@ -153,8 +164,9 @@ fn main() {
 
     // Example of failing validation
     println!("--- Invalid Request ---");
-    let invalid_req = Request::<Unvalidated, GET>::new_get("http://insecure.example.com".to_string())
-        .add_header("Authorization".to_string(), "Bearer token789".to_string());
+    let invalid_req =
+        Request::<Unvalidated, GET>::new_get("http://insecure.example.com".to_string())
+            .add_header("Authorization".to_string(), "Bearer token789".to_string());
 
     match invalid_req.validate_headers() {
         Ok(req) => match req.validate_url() {

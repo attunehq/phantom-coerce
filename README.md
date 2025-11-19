@@ -63,9 +63,9 @@ struct Directory;
 struct UnknownType;  // Generic (subsumes File and Directory)
 
 #[derive(Coerce)]
-#[coerce(borrowed = "TypedPath<UnknownBase, File>")]
-#[coerce(borrowed = "TypedPath<Absolute, UnknownType>")]
-#[coerce(borrowed = "TypedPath<UnknownBase, UnknownType>")]
+#[coerce(borrowed_from = "TypedPath<Absolute | Relative, File>", borrowed_to = "TypedPath<UnknownBase, File>")]
+#[coerce(borrowed_from = "TypedPath<Absolute, File>", borrowed_to = "TypedPath<Absolute, UnknownType>")]
+#[coerce(borrowed_from = "TypedPath<Absolute | Relative, File | Directory>", borrowed_to = "TypedPath<UnknownBase, UnknownType>")]
 struct TypedPath<Base, Type> {
     base: PhantomData<Base>,
     ty: PhantomData<Type>,
@@ -100,13 +100,55 @@ let coerced = path.coerce::<TypedPath<UnknownBase, File>>();
 
 Similarly, `into_coerced::<T>()` and `to_coerced::<T>()` support turbofish for owned and cloned coercions.
 
+#### Type Hole Syntax for Partial Coercion
+
+Use `_` type holes in type parameters to preserve specific parameters while coercing others:
+
+```rust
+use std::marker::PhantomData;
+use phantom_coerce::Coerce;
+
+struct Absolute;
+struct Relative;
+struct SomeBase;  // Generic base
+
+struct File;
+struct Directory;
+
+#[derive(Coerce)]
+#[coerce(borrowed_from = "TypedPath<Absolute | Relative, _>", borrowed_to = "TypedPath<SomeBase, _>")]  // Coerce Base only, preserve Type
+struct TypedPath<Base, Type> {
+    base: PhantomData<Base>,
+    ty: PhantomData<Type>,
+    path: String,
+}
+
+fn main() {
+    let file_path = TypedPath::<Absolute, File> {
+        base: PhantomData,
+        ty: PhantomData,
+        path: "/home/user/file.txt".to_string(),
+    };
+
+    // Coerce Base to SomeBase, Type stays as File
+    let coerced: &TypedPath<SomeBase, File> = file_path.coerce();
+
+    // This won't compile: type hole prevents File from becoming Directory
+    // let wrong: &TypedPath<SomeBase, Directory> = file_path.coerce();
+}
+```
+
+Type holes ensure type safety by preventing unintended cross-parameter coercions. The type hole `_` in the target position matches the corresponding position in the source type, ensuring that parameter stays unchanged during coercion.
+
+Type holes must be in the same position for both `from` and `to` parameters of every `#[coerce(...)]` block: if one side has it, the other side must also have it in the same position. In effect, a type hole enforces a that the coercion for that parameter is `identity`.
+
 #### Optional `AsRef` Integration
 
 Add the `asref` marker to also generate `AsRef` implementations:
 
 ```rust
 #[derive(Coerce)]
-#[coerce(borrowed = "TypedPath<UnknownBase, File>", asref)]
+#[coerce(borrowed_from = "TypedPath<Absolute | Relative, File>", borrowed_to = "TypedPath<UnknownBase, File>", asref)]
 struct TypedPath<Base, Type> {
     base: PhantomData<Base>,
     ty: PhantomData<Type>,
@@ -137,7 +179,7 @@ struct Unvalidated;
 struct AnyStatus;  // Generic (subsumes Validated and Unvalidated)
 
 #[derive(Coerce)]
-#[coerce(owned = "Request<AnyStatus>")]
+#[coerce(owned_from = "Request<Validated | Unvalidated>", owned_to = "Request<AnyStatus>")]
 struct Request<Status> {
     marker: PhantomData<Status>,
     url: String,
@@ -169,7 +211,7 @@ struct Xml;
 struct AnyFormat;  // Generic (subsumes Json and Xml)
 
 #[derive(Coerce, Clone)]
-#[coerce(cloned = "Message<AnyFormat>")]
+#[coerce(cloned_from = "Message<Json | Xml>", cloned_to = "Message<AnyFormat>")]
 struct Message<Format> {
     marker: PhantomData<Format>,
     content: String,
@@ -209,16 +251,22 @@ trait CoerceRefTypedPath<Output: ?Sized> {
     fn coerce(&self) -> &Output;
 }
 
-impl<Base, Type> CoerceRefTypedPath<TypedPath<UnknownBase, File>> for TypedPath<Base, Type> {
+// Generated impl for Absolute -> UnknownBase
+impl CoerceRefTypedPath<TypedPath<UnknownBase, File>> for TypedPath<Absolute, File> {
     fn coerce(&self) -> &TypedPath<UnknownBase, File> {
-        // Compile-time safety guards: ensure all fields are accounted for
+        // Compile-time safety guard: ensure all fields are accounted for
         let TypedPath { base: _, ty: _, path: _ } = self;
-        let _: &PhantomData<Base> = &self.base;
-        let _: &PhantomData<Type> = &self.ty;
-        let _: &String = &self.path;
 
         // SAFETY: Types differ only in PhantomData type parameters.
-        // The destructuring pattern and type annotations above ensure this at compile time.
+        // The destructuring pattern ensures this at compile time.
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+// Generated impl for Relative -> UnknownBase
+impl CoerceRefTypedPath<TypedPath<UnknownBase, File>> for TypedPath<Relative, File> {
+    fn coerce(&self) -> &TypedPath<UnknownBase, File> {
+        let TypedPath { base: _, ty: _, path: _ } = self;
         unsafe { std::mem::transmute(self) }
     }
 }
@@ -233,13 +281,22 @@ trait CoerceOwnedRequest<Output> {
     fn into_coerced(self) -> Output;
 }
 
-impl<Status> CoerceOwnedRequest<Request<AnyStatus>> for Request<Status> {
+// Generated impl for Validated -> AnyStatus
+impl CoerceOwnedRequest<Request<AnyStatus>> for Request<Validated> {
     fn into_coerced(self) -> Request<AnyStatus> {
         // Compile-time safety guard: ensure all fields are accounted for
         let Request { marker: _, url: _, headers: _ } = &self;
 
         // SAFETY: Types differ only in PhantomData type parameters.
         // The destructuring pattern above ensures this at compile time.
+        unsafe { std::mem::transmute(self) }
+    }
+}
+
+// Generated impl for Unvalidated -> AnyStatus
+impl CoerceOwnedRequest<Request<AnyStatus>> for Request<Unvalidated> {
+    fn into_coerced(self) -> Request<AnyStatus> {
+        let Request { marker: _, url: _, headers: _ } = &self;
         unsafe { std::mem::transmute(self) }
     }
 }
@@ -254,9 +311,10 @@ trait CoerceClonedMessage<Output> {
     fn to_coerced(&self) -> Output;
 }
 
-impl<Format> CoerceClonedMessage<Message<AnyFormat>> for Message<Format>
+// Generated impl for Json -> AnyFormat
+impl CoerceClonedMessage<Message<AnyFormat>> for Message<Json>
 where
-    Message<Format>: Clone,
+    Message<Json>: Clone,
 {
     fn to_coerced(&self) -> Message<AnyFormat> {
         // Compile-time safety guard: ensure all fields are accounted for
@@ -268,6 +326,17 @@ where
         unsafe { std::mem::transmute(self.clone()) }
     }
 }
+
+// Generated impl for Xml -> AnyFormat
+impl CoerceClonedMessage<Message<AnyFormat>> for Message<Xml>
+where
+    Message<Xml>: Clone,
+{
+    fn to_coerced(&self) -> Message<AnyFormat> {
+        let Message { marker: _, content: _, metadata: _ } = self;
+        unsafe { std::mem::transmute(self.clone()) }
+    }
+}
 ```
 
 ### Generated Code (AsRef)
@@ -275,7 +344,15 @@ where
 When using the `asref` marker with borrowed coercions:
 
 ```rust
-impl<Base, Type> AsRef<TypedPath<UnknownBase, File>> for TypedPath<Base, Type> {
+// Generated AsRef impl for Absolute -> UnknownBase
+impl AsRef<TypedPath<UnknownBase, File>> for TypedPath<Absolute, File> {
+    fn as_ref(&self) -> &TypedPath<UnknownBase, File> {
+        self.coerce()
+    }
+}
+
+// Generated AsRef impl for Relative -> UnknownBase
+impl AsRef<TypedPath<UnknownBase, File>> for TypedPath<Relative, File> {
     fn as_ref(&self) -> &TypedPath<UnknownBase, File> {
         self.coerce()
     }

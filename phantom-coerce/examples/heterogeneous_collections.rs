@@ -19,9 +19,18 @@ struct Enriched;
 struct AnyState; // Generic state
 
 #[derive(Coerce)]
-#[coerce(borrowed = "DataItem<AnySource, Raw>")]
-#[coerce(borrowed = "DataItem<Database, AnyState>")]
-#[coerce(borrowed = "DataItem<AnySource, AnyState>")]
+#[coerce(
+    borrowed_from = "DataItem<Database | Api, Raw>",
+    borrowed_to = "DataItem<AnySource, Raw>"
+)]
+#[coerce(
+    borrowed_from = "DataItem<Database, Raw | Validated | Enriched>",
+    borrowed_to = "DataItem<Database, AnyState>"
+)]
+#[coerce(
+    borrowed_from = "DataItem<Database | Api | Cache | FileSystem, Raw | Validated | Enriched>",
+    borrowed_to = "DataItem<AnySource, AnyState>"
+)]
 struct DataItem<Source, State> {
     source: PhantomData<Source>,
     state: PhantomData<State>,
@@ -109,15 +118,23 @@ fn main() {
     println!("=== Heterogeneous Collections with Coercion ===\n");
 
     // Create items from different sources with different states
-    let db_item = DataItem::<Database, Raw>::from_database("user_123".to_string(), "user data from DB".to_string());
+    let db_item = DataItem::<Database, Raw>::from_database(
+        "user_123".to_string(),
+        "user data from DB".to_string(),
+    );
 
-    let api_item = DataItem::<Api, Raw>::from_api("order_456".to_string(), "order data from API".to_string());
+    let api_item =
+        DataItem::<Api, Raw>::from_api("order_456".to_string(), "order data from API".to_string());
 
-    let cache_item =
-        DataItem::<Cache, Validated>::from_cache("session_789".to_string(), "validated session data".to_string());
+    let cache_item = DataItem::<Cache, Validated>::from_cache(
+        "session_789".to_string(),
+        "validated session data".to_string(),
+    );
 
-    let file_item =
-        DataItem::<FileSystem, Enriched>::from_file("config_000".to_string(), "enriched config data".to_string());
+    let file_item = DataItem::<FileSystem, Enriched>::from_file(
+        "config_000".to_string(),
+        "enriched config data".to_string(),
+    );
 
     println!("--- Created Items with Specific Types ---");
     println!("✓ Database item (Raw): {}", db_item.id());
@@ -136,7 +153,10 @@ fn main() {
         file_item.coerce(),
     ];
 
-    println!("✓ Stored {} items in homogeneous collection", generic_items.len());
+    println!(
+        "✓ Stored {} items in homogeneous collection",
+        generic_items.len()
+    );
 
     println!("\n--- Processing Generic Collection ---");
     list_all_ids(&generic_items);
@@ -150,8 +170,8 @@ fn main() {
     let raw_items: Vec<&DataItem<AnySource, Raw>> = vec![
         db_item.coerce(), // Database -> AnySource (keeping Raw)
         api_item.coerce(), // Api -> AnySource (keeping Raw)
-        // cache_item is Validated, can't include it here
-        // file_item is Enriched, can't include it here
+                          // cache_item is Validated, can't include it here
+                          // file_item is Enriched, can't include it here
     ];
 
     println!("Raw items collection:");
@@ -163,9 +183,9 @@ fn main() {
     // Only database items, but any processing state
     let db_items: Vec<&DataItem<Database, AnyState>> = vec![
         db_item.coerce(), // Keep Database source, generalize state
-        // api_item is from Api, can't include it
-        // cache_item is from Cache, can't include it
-        // file_item is from FileSystem, can't include it
+                          // api_item is from Api, can't include it
+                          // cache_item is from Cache, can't include it
+                          // file_item is from FileSystem, can't include it
     ];
 
     println!("Database items:");

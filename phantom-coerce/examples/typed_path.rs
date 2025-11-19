@@ -19,9 +19,19 @@ struct UnknownType;
 
 /// A strongly-typed path that tracks both base type and content type
 #[derive(Debug, Coerce)]
-#[coerce(borrowed = "TypedPath<UnknownBase, File>", asref)]
-#[coerce(borrowed = "TypedPath<Absolute, UnknownType>")]
-#[coerce(borrowed = "TypedPath<UnknownBase, UnknownType>")]
+#[coerce(
+    borrowed_from = "TypedPath<Absolute | Relative, File>",
+    borrowed_to = "TypedPath<UnknownBase, File>",
+    asref
+)]
+#[coerce(
+    borrowed_from = "TypedPath<Absolute, File>",
+    borrowed_to = "TypedPath<Absolute, UnknownType>"
+)]
+#[coerce(
+    borrowed_from = "TypedPath<Absolute | Relative, File | Directory>",
+    borrowed_to = "TypedPath<UnknownBase, UnknownType>"
+)]
 struct TypedPath<Base, Type> {
     _base: PhantomData<Base>,
     _type: PhantomData<Type>,

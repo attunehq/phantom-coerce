@@ -1,17 +1,75 @@
 use phantom_coerce::Coerce;
 use std::marker::PhantomData;
 
-// Type-level markers for testing
+struct Relative;
 struct Absolute;
 struct SomeBase;
 
+struct Directory;
 struct File;
 struct SomeType;
 
 #[derive(Coerce)]
-#[coerce(borrowed = "TypedPath<SomeBase, File>")]
-#[coerce(borrowed = "TypedPath<Absolute, SomeType>")]
-#[coerce(borrowed = "TypedPath<SomeBase, SomeType>")]
+#[coerce(
+    borrowed_from = "TypedPathRestricted<Absolute | Relative, _>",
+    borrowed_to = "TypedPathRestricted<SomeBase, _>"
+)]
+struct TypedPathRestricted<Base, Type> {
+    base: PhantomData<Base>,
+    ty: PhantomData<Type>,
+    path: String,
+}
+
+impl<Base, Type> TypedPathRestricted<Base, Type> {
+    fn new(path: &str) -> Self {
+        Self {
+            base: PhantomData,
+            ty: PhantomData,
+            path: path.to_string(),
+        }
+    }
+
+    fn as_str(&self) -> &str {
+        &self.path
+    }
+}
+
+#[test]
+fn test_single_param_coercion_restricted() {
+    let path = TypedPathRestricted::<Absolute, File>::new("/home/user/file.txt");
+
+    // Coerce Base parameter only (Type stays as File)
+    let coerced: &TypedPathRestricted<SomeBase, File> = path.coerce();
+    assert_eq!(coerced.as_str(), "/home/user/file.txt");
+
+    // TypeHole ensures Type parameter is preserved
+    // This CANNOT compile (File doesn't change to Directory):
+    // let coerced: &TypedPathRestricted<SomeBase, Directory> = path.coerce();
+
+    let path = TypedPathRestricted::<Relative, Directory>::new("user/dir");
+
+    // Coerce Base parameter only (Type stays as Directory)
+    let coerced: &TypedPathRestricted<SomeBase, Directory> = path.coerce();
+    assert_eq!(coerced.as_str(), "user/dir");
+
+    // TypeHole ensures Type parameter is preserved
+    // This CANNOT compile (Directory doesn't change to File):
+    // let coerced: &TypedPathRestricted<SomeBase, File> = path.coerce();
+}
+
+#[derive(Coerce)]
+#[coerce(
+    borrowed_from = "TypedPath<Absolute, File>",
+    borrowed_to = "TypedPath<SomeBase, File>"
+)]
+#[coerce(
+    borrowed_from = "TypedPath<Absolute, File>",
+    borrowed_to = "TypedPath<Absolute, SomeType>"
+)]
+#[coerce(
+    borrowed_from = "TypedPath<Absolute, File>",
+    borrowed_to = "TypedPath<SomeBase, SomeType>"
+)]
 struct TypedPath<Base, Type> {
     base: PhantomData<Base>,
     ty: PhantomData<Type>,
@@ -56,7 +114,10 @@ fn test_multi_param_coercion() {
 
 // Test with a simple single-parameter type
 #[derive(Coerce)]
-#[coerce(borrowed = "Simple<OtherMarker>")]
+#[coerce(
+    borrowed_from = "Simple<OriginalMarker>",
+    borrowed_to = "Simple<OtherMarker>"
+)]
 struct Simple<Marker> {
     phantom: PhantomData<Marker>,
     value: i32,
@@ -87,8 +148,14 @@ fn test_simple_coercion() {
 
 // Test with multiple fields including non-phantom fields
 #[derive(Coerce)]
-#[coerce(borrowed = "Complex<B, OtherState>")]
-#[coerce(borrowed = "Complex<OtherData, AnotherState>")]
+#[coerce(
+    borrowed_from = "Complex<A, State>",
+    borrowed_to = "Complex<B, OtherState>"
+)]
+#[coerce(
+    borrowed_from = "Complex<A, State>",
+    borrowed_to = "Complex<OtherData, AnotherState>"
+)]
 struct Complex<D, S> {
     phantom_data: PhantomData<D>,
     phantom_state: PhantomData<S>,
@@ -135,8 +202,11 @@ fn test_complex_coercion() {
 
 // Test owned coercions
 #[derive(Coerce)]
-#[coerce(owned = "Owned<OtherOwned>")]
-#[coerce(borrowed = "Owned<OtherOwned>")]
+#[coerce(owned_from = "Owned<OriginalOwned>", owned_to = "Owned<OtherOwned>")]
+#[coerce(
+    borrowed_from = "Owned<OriginalOwned>",
+    borrowed_to = "Owned<OtherOwned>"
+)]
 struct Owned<Marker> {
     phantom: PhantomData<Marker>,
     value: String,
@@ -184,8 +254,8 @@ fn test_borrowed_vs_owned() {
 
 // Test owned coercion with multiple parameters
 #[derive(Coerce)]
-#[coerce(owned = "MultiOwned<X, Y>")]
-#[coerce(owned = "MultiOwned<Y, X>")]
+#[coerce(owned_from = "MultiOwned<Z, Z>", owned_to = "MultiOwned<X, Y>")]
+#[coerce(owned_from = "MultiOwned<X, Y>", owned_to = "MultiOwned<Y, X>")]
 struct MultiOwned<P1, P2> {
     p1: PhantomData<P1>,
     p2: PhantomData<P2>,
@@ -228,7 +298,10 @@ fn test_multi_owned_coercion() {
 
 // Test cloned coercions (requires Clone)
 #[derive(Coerce, Clone)]
-#[coerce(cloned = "Cloned<OtherMarker>")]
+#[coerce(
+    cloned_from = "Cloned<ClonedMarker1>",
+    cloned_to = "Cloned<OtherMarker>"
+)]
 struct Cloned<Marker> {
     phantom: PhantomData<Marker>,
     value: String,
@@ -278,8 +351,8 @@ fn test_cloned_coercion() {
 
 // Test cloned with complex types
 #[derive(Coerce, Clone)]
-#[coerce(cloned = "ComplexCloned<B, Y>")]
-#[coerce(cloned = "ComplexCloned<A, Y>")]
+#[coerce(cloned_from = "ComplexCloned<A, X>", cloned_to = "ComplexCloned<B, Y>")]
+#[coerce(cloned_from = "ComplexCloned<A, X>", cloned_to = "ComplexCloned<A, Y>")]
 struct ComplexCloned<P1, P2> {
     p1: PhantomData<P1>,
     p2: PhantomData<P2>,
@@ -334,7 +407,11 @@ struct WithAsRef;
 struct ToAsRef;
 
 #[derive(Coerce)]
-#[coerce(borrowed = "AsRefTest<ToAsRef>", asref)]
+#[coerce(
+    borrowed_from = "AsRefTest<WithAsRef>",
+    borrowed_to = "AsRefTest<ToAsRef>",
+    asref
+)]
 struct AsRefTest<M> {
     marker: PhantomData<M>,
     value: i32,
@@ -386,4 +463,54 @@ fn test_turbofish_syntax() {
     let cloned = Cloned::<ClonedMarker1>::new("turbofish".to_string());
     let coerced_cloned = cloned.to_coerced::<Cloned<OtherMarker>>();
     assert_eq!(coerced_cloned.get_value(), "turbofish");
+}
+
+// Test type hole in different positions with explicit source types
+struct ParamA;
+struct ParamB;
+struct ParamX;
+struct ParamY;
+struct GenericParam;
+
+// TypeHole in second position: coerce first param, preserve second param
+#[derive(Coerce)]
+#[coerce(
+    borrowed_from = "TypeHoleSecond<ParamA | ParamB, _>",
+    borrowed_to = "TypeHoleSecond<GenericParam, _>"
+)]
+struct TypeHoleSecond<First, Second> {
+    phantom_first: PhantomData<First>,
+    phantom_second: PhantomData<Second>,
+    value: String,
+}
+
+impl<First, Second> TypeHoleSecond<First, Second> {
+    fn new(value: String) -> Self {
+        Self {
+            phantom_first: PhantomData,
+            phantom_second: PhantomData,
+            value,
+        }
+    }
+
+    fn get_value(&self) -> &str {
+        &self.value
+    }
+}
+
+#[test]
+fn test_type_hole_in_second_position() {
+    // Test with ParamA in first position, ParamX in second position
+    let test_a = TypeHoleSecond::<ParamA, ParamX>::new("type hole second A".to_string());
+
+    // ParamA -> GenericParam, ParamX preserved by type hole
+    let coerced_a: &TypeHoleSecond<GenericParam, ParamX> = test_a.coerce();
+    assert_eq!(coerced_a.get_value(), "type hole second A");
+
+    // Test with ParamB in first position, ParamY in second position
+    let test_b = TypeHoleSecond::<ParamB, ParamY>::new("type hole second B".to_string());
+
+    // ParamB -> GenericParam, ParamY preserved by type hole
+    let coerced_b: &TypeHoleSecond<GenericParam, ParamY> = test_b.coerce();
+    assert_eq!(coerced_b.get_value(), "type hole second B");
 }
