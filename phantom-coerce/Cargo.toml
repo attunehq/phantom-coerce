@@ -2,6 +2,7 @@
 name = "phantom-coerce"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
 license = "Apache-2.0"
 description = "Safe, zero-cost coercion between types differing only in PhantomData parameters"
 repository = "https://github.com/attunehq/phantom-coerce"

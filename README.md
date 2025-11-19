@@ -295,12 +295,18 @@ The macro includes multiple compile-time safety checks:
 
 See the [`examples/`](examples/) directory:
 
-- [`typed_path.rs`](examples/typed_path.rs) - Complete example with typed filesystem paths and AsRef integration
+- [`typed_path.rs`](examples/typed_path.rs) - Borrowed coercion with typed filesystem paths and AsRef integration
+- [`request_validation.rs`](examples/request_validation.rs) - Owned coercion for request validation pipelines
+- [`message_formats.rs`](examples/message_formats.rs) - Cloned coercion for message format handling
+- [`heterogeneous_collections.rs`](examples/heterogeneous_collections.rs) - Storing items with different marker types in collections
 
-Run with:
+Run examples with:
 
 ```bash
 cargo run --example typed_path
+cargo run --example request_validation
+cargo run --example message_formats
+cargo run --example heterogeneous_collections
 ```
 
 ## Testing
