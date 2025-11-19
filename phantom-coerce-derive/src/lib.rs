@@ -20,6 +20,62 @@ enum CoercionMode {
     Cloned,
 }
 
+/// Derive macro for safe, zero-cost coercion between types differing only in PhantomData parameters.
+///
+/// # Coercion Modes
+///
+/// - `#[coerce(borrowed = "Target")]`: Generate `coerce(&self) -> &Target` method
+/// - `#[coerce(owned = "Target")]`: Generate `into_coerced(self) -> Target` method
+/// - `#[coerce(cloned = "Target")]`: Generate `to_coerced(&self) -> Target` method (requires Clone)
+///
+/// # Optional Markers
+///
+/// - `asref`: For borrowed coercions, also generate `AsRef<Target>` implementation
+///   - Example: `#[coerce(borrowed = "Type<T>", asref)]`
+///
+/// # Turbofish Support
+///
+/// All methods support turbofish syntax for explicit type specification:
+/// - `.coerce::<Target>()` instead of needing type annotations
+/// - `.into_coerced::<Target>()`
+/// - `.to_coerced::<Target>()`
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use std::marker::PhantomData;
+/// use phantom_coerce::Coerce;
+///
+/// struct State1;
+/// struct State2;
+///
+/// #[derive(Coerce, Clone)]
+/// #[coerce(borrowed = "Machine<State2>", asref)]
+/// #[coerce(owned = "Machine<State2>")]
+/// #[coerce(cloned = "Machine<State2>")]
+/// struct Machine<S> {
+///     state: PhantomData<S>,
+///     data: Vec<i32>,
+/// }
+///
+/// fn main() {
+///     let m = Machine::<State1> { state: PhantomData, data: vec![1, 2, 3] };
+///
+///     // Borrowed: both inference and turbofish work
+///     let r1: &Machine<State2> = m.coerce();
+///     let r2 = m.coerce::<Machine<State2>>();
+///
+///     // AsRef (when marker is present)
+///     let r3: &Machine<State2> = m.as_ref();
+///
+///     // Owned (consumes m)
+///     let m2 = Machine::<State1> { state: PhantomData, data: vec![4, 5] };
+///     let owned: Machine<State2> = m2.into_coerced();
+///
+///     // Cloned (m remains usable)
+///     let cloned = m.to_coerced::<Machine<State2>>();
+/// }
+/// ```
 #[proc_macro_derive(Coerce, attributes(coerce))]
 pub fn derive_coerce(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
