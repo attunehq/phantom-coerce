@@ -1,11 +1,11 @@
+//! Example demonstrating type holes for partial coercion
+//!
+//! This example addresses the challenge of coercing one type parameter
+//! while preserving another, preventing unintended cross-parameter coercions
+//! like accidentally turning a File into a Directory.
+
 use phantom_coerce::Coerce;
 use std::marker::PhantomData;
-
-/// Example demonstrating type holes for partial coercion
-///
-/// This example addresses the challenge of coercing one type parameter
-/// while preserving another, preventing unintended cross-parameter coercions
-/// like accidentally turning a File into a Directory.
 
 // Base path types (absolute vs relative paths)
 struct Absolute;
