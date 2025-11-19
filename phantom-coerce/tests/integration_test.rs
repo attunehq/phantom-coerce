@@ -60,15 +60,7 @@ fn test_single_param_coercion_restricted() {
 #[derive(Coerce)]
 #[coerce(
     borrowed_from = "TypedPath<Absolute, File>",
-    borrowed_to = "TypedPath<SomeBase, File>"
-)]
-#[coerce(
-    borrowed_from = "TypedPath<Absolute, File>",
-    borrowed_to = "TypedPath<Absolute, SomeType>"
-)]
-#[coerce(
-    borrowed_from = "TypedPath<Absolute, File>",
-    borrowed_to = "TypedPath<SomeBase, SomeType>"
+    borrowed_to = "TypedPath<SomeBase | Absolute, File | SomeType>"
 )]
 struct TypedPath<Base, Type> {
     base: PhantomData<Base>,
@@ -77,11 +69,11 @@ struct TypedPath<Base, Type> {
 }
 
 impl<Base, Type> TypedPath<Base, Type> {
-    fn new(path: String) -> Self {
+    fn new(path: &str) -> Self {
         Self {
             base: PhantomData,
             ty: PhantomData,
-            path,
+            path: path.to_string(),
         }
     }
 
@@ -92,7 +84,7 @@ impl<Base, Type> TypedPath<Base, Type> {
 
 #[test]
 fn test_single_param_coercion() {
-    let path = TypedPath::<Absolute, File>::new("/home/user/file.txt".to_string());
+    let path = TypedPath::<Absolute, File>::new("/home/user/file.txt");
 
     // Coerce Base parameter
     let coerced: &TypedPath<SomeBase, File> = path.coerce();
@@ -105,7 +97,7 @@ fn test_single_param_coercion() {
 
 #[test]
 fn test_multi_param_coercion() {
-    let path = TypedPath::<Absolute, File>::new("/home/user/file.txt".to_string());
+    let path = TypedPath::<Absolute, File>::new("/home/user/file.txt");
 
     // Coerce both parameters at once
     let coerced: &TypedPath<SomeBase, SomeType> = path.coerce();
@@ -150,11 +142,7 @@ fn test_simple_coercion() {
 #[derive(Coerce)]
 #[coerce(
     borrowed_from = "Complex<A, State>",
-    borrowed_to = "Complex<B, OtherState>"
-)]
-#[coerce(
-    borrowed_from = "Complex<A, State>",
-    borrowed_to = "Complex<OtherData, AnotherState>"
+    borrowed_to = "Complex<B, OtherState> | Complex<OtherData, AnotherState>"
 )]
 struct Complex<D, S> {
     phantom_data: PhantomData<D>,
@@ -173,11 +161,11 @@ struct OtherData;
 struct AnotherState;
 
 impl<D, S> Complex<D, S> {
-    fn new(s: String, i: i32) -> Self {
+    fn new(s: &str, i: i32) -> Self {
         Self {
             phantom_data: PhantomData,
             phantom_state: PhantomData,
-            real_field1: s,
+            real_field1: s.to_string(),
             real_field2: i,
         }
     }
@@ -190,12 +178,12 @@ impl<D, S> Complex<D, S> {
 #[test]
 fn test_complex_coercion() {
     // Test coercing to Complex<B, OtherState> (both params changed)
-    let complex1 = Complex::<A, State>::new("test1".to_string(), 123);
+    let complex1 = Complex::<A, State>::new("test1", 123);
     let coerced1: &Complex<B, OtherState> = complex1.coerce();
     assert_eq!(coerced1.get_data(), ("test1", 123));
 
     // Test coercing to Complex<OtherData, AnotherState> (both params changed differently)
-    let complex2 = Complex::<A, State>::new("test2".to_string(), 456);
+    let complex2 = Complex::<A, State>::new("test2", 456);
     let coerced2: &Complex<OtherData, AnotherState> = complex2.coerce();
     assert_eq!(coerced2.get_data(), ("test2", 456));
 }
@@ -216,10 +204,10 @@ struct OriginalOwned;
 struct OtherOwned;
 
 impl<M> Owned<M> {
-    fn new(value: String) -> Self {
+    fn new(value: &str) -> Self {
         Self {
             phantom: PhantomData,
-            value,
+            value: value.to_string(),
         }
     }
 
@@ -230,7 +218,7 @@ impl<M> Owned<M> {
 
 #[test]
 fn test_owned_coercion() {
-    let owned = Owned::<OriginalOwned>::new("hello".to_string());
+    let owned = Owned::<OriginalOwned>::new("hello");
 
     // Test owned coercion (consumes the original)
     let coerced: Owned<OtherOwned> = owned.into_coerced();
@@ -239,7 +227,7 @@ fn test_owned_coercion() {
 
 #[test]
 fn test_borrowed_vs_owned() {
-    let owned1 = Owned::<OriginalOwned>::new("borrowed".to_string());
+    let owned1 = Owned::<OriginalOwned>::new("borrowed");
 
     // Can use borrowed coercion multiple times
     let borrowed1: &Owned<OtherOwned> = owned1.coerce();
@@ -311,10 +299,10 @@ struct Cloned<Marker> {
 struct ClonedMarker1;
 
 impl<M> Cloned<M> {
-    fn new(value: String) -> Self {
+    fn new(value: &str) -> Self {
         Self {
             phantom: PhantomData,
-            value,
+            value: value.to_string(),
         }
     }
 
@@ -325,7 +313,7 @@ impl<M> Cloned<M> {
 
 #[test]
 fn test_cloned_coercion() {
-    let cloned = Cloned::<ClonedMarker1>::new("hello cloned".to_string());
+    let cloned = Cloned::<ClonedMarker1>::new("hello cloned");
 
     // Clone and coerce (source remains usable)
     let coerced: Cloned<OtherMarker> = cloned.to_coerced();
@@ -351,8 +339,10 @@ fn test_cloned_coercion() {
 
 // Test cloned with complex types
 #[derive(Coerce, Clone)]
-#[coerce(cloned_from = "ComplexCloned<A, X>", cloned_to = "ComplexCloned<B, Y>")]
-#[coerce(cloned_from = "ComplexCloned<A, X>", cloned_to = "ComplexCloned<A, Y>")]
+#[coerce(
+    cloned_from = "ComplexCloned<A, X>",
+    cloned_to = "ComplexCloned<B, Y> | ComplexCloned<A, Y>"
+)]
 struct ComplexCloned<P1, P2> {
     p1: PhantomData<P1>,
     p2: PhantomData<P2>,
@@ -361,11 +351,11 @@ struct ComplexCloned<P1, P2> {
 }
 
 impl<P1, P2> ComplexCloned<P1, P2> {
-    fn new(data: Vec<String>, count: i32) -> Self {
+    fn new(data: &[&str], count: i32) -> Self {
         Self {
             p1: PhantomData,
             p2: PhantomData,
-            data,
+            data: data.iter().map(|s| s.to_string()).collect(),
             count,
         }
     }
@@ -381,10 +371,7 @@ impl<P1, P2> ComplexCloned<P1, P2> {
 
 #[test]
 fn test_complex_cloned_coercion() {
-    let complex = ComplexCloned::<A, X>::new(
-        vec!["one".to_string(), "two".to_string(), "three".to_string()],
-        42,
-    );
+    let complex = ComplexCloned::<A, X>::new(&["one", "two", "three"], 42);
 
     // Clone and coerce to different markers
     let coerced1: ComplexCloned<B, Y> = complex.to_coerced();
@@ -450,17 +437,17 @@ fn test_asref_integration() {
 #[test]
 fn test_turbofish_syntax() {
     // Test borrowed with turbofish
-    let path = TypedPath::<Absolute, File>::new("/test".to_string());
+    let path = TypedPath::<Absolute, File>::new("/test");
     let coerced = path.coerce::<TypedPath<SomeBase, File>>();
     assert_eq!(coerced.as_str(), "/test");
 
     // Test owned with turbofish
-    let owned = Owned::<OriginalOwned>::new("owned turbofish".to_string());
+    let owned = Owned::<OriginalOwned>::new("owned turbofish");
     let coerced_owned = owned.into_coerced::<Owned<OtherOwned>>();
     assert_eq!(coerced_owned.get_value(), "owned turbofish");
 
     // Test cloned with turbofish
-    let cloned = Cloned::<ClonedMarker1>::new("turbofish".to_string());
+    let cloned = Cloned::<ClonedMarker1>::new("turbofish");
     let coerced_cloned = cloned.to_coerced::<Cloned<OtherMarker>>();
     assert_eq!(coerced_cloned.get_value(), "turbofish");
 }
@@ -485,11 +472,11 @@ struct TypeHoleSecond<First, Second> {
 }
 
 impl<First, Second> TypeHoleSecond<First, Second> {
-    fn new(value: String) -> Self {
+    fn new(value: &str) -> Self {
         Self {
             phantom_first: PhantomData,
             phantom_second: PhantomData,
-            value,
+            value: value.to_string(),
         }
     }
 
@@ -501,14 +488,14 @@ impl<First, Second> TypeHoleSecond<First, Second> {
 #[test]
 fn test_type_hole_in_second_position() {
     // Test with ParamA in first position, ParamX in second position
-    let test_a = TypeHoleSecond::<ParamA, ParamX>::new("type hole second A".to_string());
+    let test_a = TypeHoleSecond::<ParamA, ParamX>::new("type hole second A");
 
     // ParamA -> GenericParam, ParamX preserved by type hole
     let coerced_a: &TypeHoleSecond<GenericParam, ParamX> = test_a.coerce();
     assert_eq!(coerced_a.get_value(), "type hole second A");
 
     // Test with ParamB in first position, ParamY in second position
-    let test_b = TypeHoleSecond::<ParamB, ParamY>::new("type hole second B".to_string());
+    let test_b = TypeHoleSecond::<ParamB, ParamY>::new("type hole second B");
 
     // ParamB -> GenericParam, ParamY preserved by type hole
     let coerced_b: &TypeHoleSecond<GenericParam, ParamY> = test_b.coerce();

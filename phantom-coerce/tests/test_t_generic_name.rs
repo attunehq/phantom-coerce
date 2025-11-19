@@ -10,14 +10,12 @@ struct TypeB;
 #[coerce(borrowed_from = "UsesT<TypeA>", borrowed_to = "UsesT<TypeB>")]
 struct UsesT<T> {
     phantom: PhantomData<T>,
-    value: String,
 }
 
 #[test]
 fn test_t_generic_name_no_longer_conflicts() {
     let test = UsesT::<TypeA> {
         phantom: PhantomData,
-        value: "test".to_string(),
     };
 
     // This used to fail with "the name `T` is already used" but now works!

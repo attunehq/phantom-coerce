@@ -41,6 +41,25 @@ enum CoercionMode {
 /// - `#[coerce(owned = "Target")]`: Generate `into_coerced(self) -> Target` method
 /// - `#[coerce(cloned = "Target")]`: Generate `to_coerced(&self) -> Target` method (requires Clone)
 ///
+/// # Multiple Target Types with `|` Syntax
+///
+/// Use the `|` operator to specify multiple source or target types. This works at two levels:
+///
+/// **1. Top-level alternatives (between complete types):**
+/// ```ignore
+/// #[coerce(borrowed_from = "Container<TypeA>", borrowed_to = "Container<Generic> | Container<AnotherGeneric>")]
+/// ```
+/// Generates two coercions: `Container<TypeA>` → `Container<Generic>` and `Container<TypeA>` → `Container<AnotherGeneric>`
+///
+/// **2. Parameter-level alternatives (within type parameters):**
+/// ```ignore
+/// #[coerce(borrowed_from = "TypedPath<Absolute | Relative, File>", borrowed_to = "TypedPath<UnknownBase, File>")]
+/// ```
+/// Generates Cartesian product: `TypedPath<Absolute, File>` → `TypedPath<UnknownBase, File>`
+/// and `TypedPath<Relative, File>` → `TypedPath<UnknownBase, File>`
+///
+/// Both syntaxes work on both `_from` and `_to` sides.
+///
 /// # Type Hole Syntax
 ///
 /// Use `_` in type parameters to preserve specific parameters during coercion:
@@ -798,38 +817,43 @@ fn expand_coercion_spec(
     spec: &CoercionSpec,
     generics: &syn::Generics,
 ) -> syn::Result<Vec<ParsedCoercion>> {
-    // Parse the target pattern once
-    let to_parsed = parse_target_with_type_holes(&spec.to_pattern, generics)?;
+    // Split the to_pattern by | to get all target alternatives
+    let to_alternatives = split_by_pipe_respecting_brackets(&spec.to_pattern);
 
     let mut result = Vec::new();
 
     // For each from_pattern, split by | and create separate coercions
     for from_pattern in &spec.from_patterns {
         // Split by | but only at the top level (not inside <>)
-        let alternatives = split_by_pipe_respecting_brackets(from_pattern);
+        let from_alternatives = split_by_pipe_respecting_brackets(from_pattern);
 
-        for alternative in alternatives {
-            let from_parsed = parse_target_with_type_holes(&alternative, generics)?;
+        for from_alternative in from_alternatives {
+            let from_parsed = parse_target_with_type_holes(&from_alternative, generics)?;
 
-            // Validate that type hole positions match between from and to
-            if from_parsed.type_hole_positions != to_parsed.type_hole_positions {
-                return Err(syn::Error::new(
-                    proc_macro2::Span::call_site(),
-                    format!(
-                        "Type hole positions mismatch: from pattern '{}' has type holes at {:?}, but to pattern '{}' has type holes at {:?}",
-                        alternative,
-                        from_parsed.type_hole_positions,
-                        spec.to_pattern,
-                        to_parsed.type_hole_positions
-                    ),
-                ));
+            // For each to alternative, create a coercion (Cartesian product)
+            for to_alternative in &to_alternatives {
+                let to_parsed = parse_target_with_type_holes(to_alternative, generics)?;
+
+                // Validate that type hole positions match between from and to
+                if from_parsed.type_hole_positions != to_parsed.type_hole_positions {
+                    return Err(syn::Error::new(
+                        proc_macro2::Span::call_site(),
+                        format!(
+                            "Type hole positions mismatch: from pattern '{}' has type holes at {:?}, but to pattern '{}' has type holes at {:?}",
+                            from_alternative,
+                            from_parsed.type_hole_positions,
+                            to_alternative,
+                            to_parsed.type_hole_positions
+                        ),
+                    ));
+                }
+
+                result.push(ParsedCoercion {
+                    source_type: from_parsed.target_type.clone(),
+                    target_type: to_parsed.target_type.clone(),
+                    type_hole_positions: from_parsed.type_hole_positions.clone(),
+                });
             }
-
-            result.push(ParsedCoercion {
-                source_type: from_parsed.target_type.clone(),
-                target_type: to_parsed.target_type.clone(),
-                type_hole_positions: from_parsed.type_hole_positions.clone(),
-            });
         }
     }
 

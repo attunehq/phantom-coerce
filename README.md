@@ -100,6 +100,44 @@ let coerced = path.coerce::<TypedPath<UnknownBase, File>>();
 
 Similarly, `into_coerced::<T>()` and `to_coerced::<T>()` support turbofish for owned and cloned coercions.
 
+#### Multiple Target Types with `|` Syntax
+
+Use the `|` operator to specify multiple source or target types in a single coercion attribute. This works at two levels:
+
+**1. Top-level alternatives (between complete types):**
+
+```rust
+#[derive(Coerce)]
+#[coerce(
+    borrowed_from = "Container<TypeA>",
+    borrowed_to = "Container<Generic> | Container<AnotherGeneric>"
+)]
+struct Container<T> { /* ... */ }
+```
+
+This generates two separate coercions:
+- `Container<TypeA>` → `Container<Generic>`
+- `Container<TypeA>` → `Container<AnotherGeneric>`
+
+**2. Parameter-level alternatives (within type parameters):**
+
+```rust
+#[derive(Coerce)]
+#[coerce(
+    borrowed_from = "TypedPath<Absolute | Relative, File | Directory>",
+    borrowed_to = "TypedPath<UnknownBase, UnknownType>"
+)]
+struct TypedPath<Base, Type> { /* ... */ }
+```
+
+This generates a Cartesian product of all combinations (2 × 2 = 4 coercions):
+- `TypedPath<Absolute, File>` → `TypedPath<UnknownBase, UnknownType>`
+- `TypedPath<Absolute, Directory>` → `TypedPath<UnknownBase, UnknownType>`
+- `TypedPath<Relative, File>` → `TypedPath<UnknownBase, UnknownType>`
+- `TypedPath<Relative, Directory>` → `TypedPath<UnknownBase, UnknownType>`
+
+Both syntaxes work on both `_from` and `_to` sides, giving you precise control over which coercions to generate.
+
 #### Type Hole Syntax for Partial Coercion
 
 Use `_` type holes in type parameters to preserve specific parameters while coercing others:

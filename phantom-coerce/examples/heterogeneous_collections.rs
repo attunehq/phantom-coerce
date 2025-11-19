@@ -35,54 +35,49 @@ struct DataItem<Source, State> {
     source: PhantomData<Source>,
     state: PhantomData<State>,
     id: String,
-    payload: String,
     size_bytes: usize,
 }
 
 impl DataItem<Database, Raw> {
-    fn from_database(id: String, payload: String) -> Self {
+    fn from_database(id: &str, size_bytes: usize) -> Self {
         Self {
             source: PhantomData,
             state: PhantomData,
-            id,
-            size_bytes: payload.len(),
-            payload,
+            id: id.to_string(),
+            size_bytes,
         }
     }
 }
 
 impl DataItem<Api, Raw> {
-    fn from_api(id: String, payload: String) -> Self {
+    fn from_api(id: &str, size_bytes: usize) -> Self {
         Self {
             source: PhantomData,
             state: PhantomData,
-            id,
-            size_bytes: payload.len(),
-            payload,
+            id: id.to_string(),
+            size_bytes,
         }
     }
 }
 
 impl DataItem<Cache, Validated> {
-    fn from_cache(id: String, payload: String) -> Self {
+    fn from_cache(id: &str, size_bytes: usize) -> Self {
         Self {
             source: PhantomData,
             state: PhantomData,
-            id,
-            size_bytes: payload.len(),
-            payload,
+            id: id.to_string(),
+            size_bytes,
         }
     }
 }
 
 impl DataItem<FileSystem, Enriched> {
-    fn from_file(id: String, payload: String) -> Self {
+    fn from_file(id: &str, size_bytes: usize) -> Self {
         Self {
             source: PhantomData,
             state: PhantomData,
-            id,
-            size_bytes: payload.len(),
-            payload,
+            id: id.to_string(),
+            size_bytes,
         }
     }
 }
@@ -94,10 +89,6 @@ impl<Source, State> DataItem<Source, State> {
 
     fn size_bytes(&self) -> usize {
         self.size_bytes
-    }
-
-    fn payload(&self) -> &str {
-        &self.payload
     }
 }
 
@@ -118,23 +109,13 @@ fn main() {
     println!("=== Heterogeneous Collections with Coercion ===\n");
 
     // Create items from different sources with different states
-    let db_item = DataItem::<Database, Raw>::from_database(
-        "user_123".to_string(),
-        "user data from DB".to_string(),
-    );
+    let db_item = DataItem::<Database, Raw>::from_database("user_123", 17);
 
-    let api_item =
-        DataItem::<Api, Raw>::from_api("order_456".to_string(), "order data from API".to_string());
+    let api_item = DataItem::<Api, Raw>::from_api("order_456", 19);
 
-    let cache_item = DataItem::<Cache, Validated>::from_cache(
-        "session_789".to_string(),
-        "validated session data".to_string(),
-    );
+    let cache_item = DataItem::<Cache, Validated>::from_cache("session_789", 23);
 
-    let file_item = DataItem::<FileSystem, Enriched>::from_file(
-        "config_000".to_string(),
-        "enriched config data".to_string(),
-    );
+    let file_item = DataItem::<FileSystem, Enriched>::from_file("config_000", 19);
 
     println!("--- Created Items with Specific Types ---");
     println!("✓ Database item (Raw): {}", db_item.id());

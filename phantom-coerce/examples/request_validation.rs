@@ -12,21 +12,21 @@ struct FullyValidated;
 struct AnyStatus; // Generic status that can represent any validation state
 
 // HTTP method markers
-struct GET;
-struct POST;
+struct Get;
+struct Post;
 struct AnyMethod; // Generic method
 
 #[derive(Coerce, Debug)]
 #[coerce(
-    owned_from = "Request<HeadersValidated | FullyValidated, GET>",
-    owned_to = "Request<AnyStatus, GET>"
+    owned_from = "Request<HeadersValidated | FullyValidated, Get>",
+    owned_to = "Request<AnyStatus, Get>"
 )]
 #[coerce(
-    owned_from = "Request<FullyValidated, GET | POST>",
+    owned_from = "Request<FullyValidated, Get | Post>",
     owned_to = "Request<FullyValidated, AnyMethod>"
 )]
 #[coerce(
-    owned_from = "Request<HeadersValidated | FullyValidated, GET | POST>",
+    owned_from = "Request<HeadersValidated | FullyValidated, Get | Post>",
     owned_to = "Request<AnyStatus, AnyMethod>"
 )]
 struct Request<Status, Method> {
@@ -37,33 +37,33 @@ struct Request<Status, Method> {
     body: Option<Vec<u8>>,
 }
 
-impl Request<Unvalidated, GET> {
-    fn new_get(url: String) -> Self {
+impl Request<Unvalidated, Get> {
+    fn new_get(url: &str) -> Self {
         Self {
             status: PhantomData,
             method: PhantomData,
-            url,
+            url: url.to_string(),
             headers: Vec::new(),
             body: None,
         }
     }
 }
 
-impl Request<Unvalidated, POST> {
-    fn new_post(url: String, body: Vec<u8>) -> Self {
+impl Request<Unvalidated, Post> {
+    fn new_post(url: &str, body: &[u8]) -> Self {
         Self {
             status: PhantomData,
             method: PhantomData,
-            url,
+            url: url.to_string(),
             headers: Vec::new(),
-            body: Some(body),
+            body: Some(body.to_vec()),
         }
     }
 }
 
 impl<Method> Request<Unvalidated, Method> {
-    fn add_header(mut self, key: String, value: String) -> Self {
-        self.headers.push((key, value));
+    fn add_header(mut self, key: &str, value: &str) -> Self {
+        self.headers.push((key.to_string(), value.to_string()));
         self
     }
 
@@ -112,9 +112,9 @@ fn main() {
 
     // Create and validate a GET request
     println!("--- GET Request ---");
-    let get_req = Request::<Unvalidated, GET>::new_get("https://api.example.com/users".to_string())
-        .add_header("Authorization".to_string(), "Bearer token123".to_string())
-        .add_header("Accept".to_string(), "application/json".to_string());
+    let get_req = Request::<Unvalidated, Get>::new_get("https://api.example.com/users")
+        .add_header("Authorization", "Bearer token123")
+        .add_header("Accept", "application/json");
 
     match get_req.validate_headers() {
         Ok(req) => match req.validate_url() {
@@ -138,12 +138,10 @@ fn main() {
 
     // Create and validate a POST request
     println!("--- POST Request ---");
-    let post_req = Request::<Unvalidated, POST>::new_post(
-        "https://api.example.com/users".to_string(),
-        b"user data".to_vec(),
-    )
-    .add_header("Authorization".to_string(), "Bearer token456".to_string())
-    .add_header("Content-Type".to_string(), "application/json".to_string());
+    let post_req =
+        Request::<Unvalidated, Post>::new_post("https://api.example.com/users", b"user data")
+            .add_header("Authorization", "Bearer token456")
+            .add_header("Content-Type", "application/json");
 
     match post_req.validate_headers() {
         Ok(req) => match req.validate_url() {
@@ -164,9 +162,8 @@ fn main() {
 
     // Example of failing validation
     println!("--- Invalid Request ---");
-    let invalid_req =
-        Request::<Unvalidated, GET>::new_get("http://insecure.example.com".to_string())
-            .add_header("Authorization".to_string(), "Bearer token789".to_string());
+    let invalid_req = Request::<Unvalidated, Get>::new_get("http://insecure.example.com")
+        .add_header("Authorization", "Bearer token789");
 
     match invalid_req.validate_headers() {
         Ok(req) => match req.validate_url() {

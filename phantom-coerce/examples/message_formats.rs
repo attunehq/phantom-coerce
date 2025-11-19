@@ -48,12 +48,12 @@ struct Message<Format, Priority> {
 }
 
 impl Message<Json, High> {
-    fn new_json_high(id: u64, content: String) -> Self {
+    fn new_json_high(id: u64, content: &str) -> Self {
         Self {
             format: PhantomData,
             priority: PhantomData,
             id,
-            content,
+            content: content.to_string(),
             metadata: vec!["format:json".to_string(), "priority:high".to_string()],
             timestamp: current_timestamp(),
         }
@@ -61,12 +61,12 @@ impl Message<Json, High> {
 }
 
 impl Message<Xml, Normal> {
-    fn new_xml_normal(id: u64, content: String) -> Self {
+    fn new_xml_normal(id: u64, content: &str) -> Self {
         Self {
             format: PhantomData,
             priority: PhantomData,
             id,
-            content,
+            content: content.to_string(),
             metadata: vec!["format:xml".to_string(), "priority:normal".to_string()],
             timestamp: current_timestamp(),
         }
@@ -74,12 +74,12 @@ impl Message<Xml, Normal> {
 }
 
 impl Message<Protobuf, Low> {
-    fn new_protobuf_low(id: u64, content: String) -> Self {
+    fn new_protobuf_low(id: u64, content: &str) -> Self {
         Self {
             format: PhantomData,
             priority: PhantomData,
             id,
-            content,
+            content: content.to_string(),
             metadata: vec!["format:protobuf".to_string(), "priority:low".to_string()],
             timestamp: current_timestamp(),
         }
@@ -132,13 +132,11 @@ fn main() {
     println!("=== Message Format Handling with Cloned Coercion ===\n");
 
     // Create messages with different formats and priorities
-    let json_high =
-        Message::<Json, High>::new_json_high(1, r#"{"event": "user_login"}"#.to_string());
+    let json_high = Message::<Json, High>::new_json_high(1, r#"{"event": "user_login"}"#);
 
-    let xml_normal =
-        Message::<Xml, Normal>::new_xml_normal(2, "<event>data_sync</event>".to_string());
+    let xml_normal = Message::<Xml, Normal>::new_xml_normal(2, "<event>data_sync</event>");
 
-    let proto_low = Message::<Protobuf, Low>::new_protobuf_low(3, "binary_data_here".to_string());
+    let proto_low = Message::<Protobuf, Low>::new_protobuf_low(3, "binary_data_here");
 
     println!("--- Processing Messages ---");
 
