@@ -10,7 +10,7 @@ homepage = "https://github.com/attunehq/phantom-coerce"
 readme = "../README.md"
 keywords = ["phantom", "coerce", "type-safety", "zero-cost"]
 categories = ["rust-patterns", "no-std"]
-authors = ["Attune <engineering@attune.com>"]
+authors = ["Attune <engineering@attunehq.com>"]
 
 [lib]
 proc-macro = true
