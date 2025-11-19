@@ -46,16 +46,22 @@ enum CoercionMode {
 /// use std::marker::PhantomData;
 /// use phantom_coerce::Coerce;
 ///
-/// // Type markers for compile-time tracking
+/// // Type markers: concrete types and their generic equivalents
 /// struct Absolute;
 /// struct Relative;
+/// struct UnknownBase;  // Generic base (subsumes Absolute and Relative)
+///
 /// struct File;
-/// struct AnyType;
+/// struct Directory;
+/// struct UnknownType;  // Generic type (subsumes File and Directory)
 ///
 /// #[derive(Coerce, Clone)]
-/// #[coerce(borrowed = "TypedPath<Relative, File>", asref)]
-/// #[coerce(owned = "TypedPath<Relative, AnyType>")]
-/// #[coerce(cloned = "TypedPath<Absolute, AnyType>")]
+/// // Coerce both params to generic
+/// #[coerce(borrowed = "TypedPath<UnknownBase, UnknownType>", asref)]
+/// // Coerce just the type param to generic
+/// #[coerce(owned = "TypedPath<Absolute, UnknownType>")]
+/// // Coerce just the base param to generic
+/// #[coerce(cloned = "TypedPath<UnknownBase, File>")]
 /// struct TypedPath<Base, Type> {
 ///     base: PhantomData<Base>,
 ///     ty: PhantomData<Type>,
@@ -69,23 +75,23 @@ enum CoercionMode {
 ///         path: "/home/user/file.txt".to_string(),
 ///     };
 ///
-///     // Borrowed: both inference and turbofish work
-///     let r1: &TypedPath<Relative, File> = path.coerce();
-///     let r2 = path.coerce::<TypedPath<Relative, File>>();
+///     // Borrowed: coerce to fully generic (both params)
+///     let r1: &TypedPath<UnknownBase, UnknownType> = path.coerce();
+///     let r2 = path.coerce::<TypedPath<UnknownBase, UnknownType>>();
 ///
 ///     // AsRef (when marker is present)
-///     let r3: &TypedPath<Relative, File> = path.as_ref();
+///     let r3: &TypedPath<UnknownBase, UnknownType> = path.as_ref();
 ///
-///     // Owned (consumes path)
+///     // Owned: coerce type param to generic (consumes path)
 ///     let path2 = TypedPath::<Absolute, File> {
 ///         base: PhantomData,
 ///         ty: PhantomData,
 ///         path: "/test".to_string(),
 ///     };
-///     let owned: TypedPath<Relative, AnyType> = path2.into_coerced();
+///     let owned: TypedPath<Absolute, UnknownType> = path2.into_coerced();
 ///
-///     // Cloned (path remains usable)
-///     let cloned = path.to_coerced::<TypedPath<Absolute, AnyType>>();
+///     // Cloned: coerce base param to generic (path remains usable)
+///     let cloned = path.to_coerced::<TypedPath<UnknownBase, File>>();
 /// }
 /// ```
 #[proc_macro_derive(Coerce, attributes(coerce))]

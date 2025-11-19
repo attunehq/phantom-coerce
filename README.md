@@ -37,12 +37,16 @@ use phantom_coerce::Coerce;
 
 struct Absolute;
 struct Relative;
+struct UnknownBase;  // Generic (subsumes Absolute and Relative)
+
 struct File;
 struct Directory;
+struct UnknownType;  // Generic (subsumes File and Directory)
 
 #[derive(Coerce)]
-#[coerce(borrowed = "TypedPath<Relative, File>")]
-#[coerce(borrowed = "TypedPath<Absolute, Directory>")]
+#[coerce(borrowed = "TypedPath<UnknownBase, File>")]
+#[coerce(borrowed = "TypedPath<Absolute, UnknownType>")]
+#[coerce(borrowed = "TypedPath<UnknownBase, UnknownType>")]
 struct TypedPath<Base, Type> {
     base: PhantomData<Base>,
     ty: PhantomData<Type>,
@@ -56,8 +60,8 @@ fn main() {
         path: "/home/user/file.txt".to_string(),
     };
 
-    // Coerce to different phantom types (borrowed)
-    let coerced: &TypedPath<Relative, File> = path.coerce();
+    // Coerce to more generic phantom types
+    let coerced: &TypedPath<UnknownBase, File> = path.coerce();
 }
 ```
 
@@ -69,10 +73,10 @@ All coercion methods support turbofish syntax for explicit type specification:
 let path = TypedPath::<Absolute, File> { /* ... */ };
 
 // With type inference:
-let coerced: &TypedPath<Relative, File> = path.coerce();
+let coerced: &TypedPath<UnknownBase, File> = path.coerce();
 
 // With turbofish (no left-hand type annotation needed):
-let coerced = path.coerce::<TypedPath<Relative, File>>();
+let coerced = path.coerce::<TypedPath<UnknownBase, File>>();
 ```
 
 Similarly, `into_coerced::<T>()` and `to_coerced::<T>()` support turbofish for owned and cloned coercions.
@@ -83,21 +87,21 @@ Add the `asref` marker to also generate `AsRef` implementations:
 
 ```rust
 #[derive(Coerce)]
-#[coerce(borrowed = "TypedPath<Relative, File>", asref)]
+#[coerce(borrowed = "TypedPath<UnknownBase, File>", asref)]
 struct TypedPath<Base, Type> {
     base: PhantomData<Base>,
     ty: PhantomData<Type>,
     path: String,
 }
 
-fn takes_asref(path: &impl AsRef<TypedPath<Relative, File>>) {
-    let p: &TypedPath<Relative, File> = path.as_ref();
+fn takes_asref(path: &impl AsRef<TypedPath<UnknownBase, File>>) {
+    let p: &TypedPath<UnknownBase, File> = path.as_ref();
     // Use p...
 }
 
 fn main() {
     let path = TypedPath::<Absolute, File> { /* ... */ };
-    takes_asref(&path); // Works thanks to AsRef impl
+    takes_asref(&path); // Works: Absolute coerces to UnknownBase
 }
 ```
 
@@ -182,8 +186,8 @@ trait CoerceRefTypedPath<Output: ?Sized> {
     fn coerce(&self) -> &Output;
 }
 
-impl<Base, Type> CoerceRefTypedPath<TypedPath<Relative, File>> for TypedPath<Base, Type> {
-    fn coerce(&self) -> &TypedPath<Relative, File> {
+impl<Base, Type> CoerceRefTypedPath<TypedPath<UnknownBase, File>> for TypedPath<Base, Type> {
+    fn coerce(&self) -> &TypedPath<UnknownBase, File> {
         // Compile-time safety guards: ensure all fields are accounted for
         let TypedPath { base: _, ty: _, path: _ } = self;
         let _: &PhantomData<Base> = &self.base;
@@ -248,8 +252,8 @@ where
 When using the `asref` marker with borrowed coercions:
 
 ```rust
-impl<Base, Type> AsRef<TypedPath<Relative, File>> for TypedPath<Base, Type> {
-    fn as_ref(&self) -> &TypedPath<Relative, File> {
+impl<Base, Type> AsRef<TypedPath<UnknownBase, File>> for TypedPath<Base, Type> {
+    fn as_ref(&self) -> &TypedPath<UnknownBase, File> {
         self.coerce()
     }
 }
