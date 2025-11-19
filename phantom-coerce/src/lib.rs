@@ -12,13 +12,13 @@
 //! use phantom_coerce::Coerce;
 //!
 //! # struct Absolute;
-//! # struct SomeBase;
+//! # struct UnknownBase;  // Generic (subsumes Absolute)
 //! # struct File;
-//! # struct SomeType;
+//! # struct UnknownType;  // Generic (subsumes File)
 //! #
 //! #[derive(Coerce)]
-//! #[coerce(borrowed = "TypedPath<SomeBase, File>")]
-//! #[coerce(borrowed = "TypedPath<Absolute, SomeType>")]
+//! #[coerce(borrowed = "TypedPath<UnknownBase, File>")]
+//! #[coerce(borrowed = "TypedPath<Absolute, UnknownType>")]
 //! struct TypedPath<Base, Type> {
 //!     base: PhantomData<Base>,
 //!     ty: PhantomData<Type>,
@@ -31,10 +31,10 @@
 //!     ty: PhantomData,
 //!     path: std::path::PathBuf::from("/test"),
 //! };
-//! // With type inference:
-//! let coerced: &TypedPath<SomeBase, File> = path.coerce();
+//! // Coerce to more generic type (with type inference):
+//! let coerced: &TypedPath<UnknownBase, File> = path.coerce();
 //! // Or with turbofish:
-//! let coerced2 = path.coerce::<TypedPath<SomeBase, File>>();
+//! let coerced2 = path.coerce::<TypedPath<UnknownBase, File>>();
 //! # }
 //! ```
 //!
@@ -47,19 +47,19 @@
 //! use phantom_coerce::Coerce;
 //!
 //! # struct Absolute;
-//! # struct Generic;
+//! # struct UnknownBase;  // Generic (subsumes Absolute)
 //! # struct File;
 //! #
 //! #[derive(Coerce)]
-//! #[coerce(borrowed = "TypedPath<Generic, File>", asref)]
+//! #[coerce(borrowed = "TypedPath<UnknownBase, File>", asref)]
 //! struct TypedPath<Base, Type> {
 //!     base: PhantomData<Base>,
 //!     ty: PhantomData<Type>,
 //!     path: std::path::PathBuf,
 //! }
 //!
-//! fn takes_asref(path: &impl AsRef<TypedPath<Generic, File>>) {
-//!     let p: &TypedPath<Generic, File> = path.as_ref();
+//! fn takes_asref(path: &impl AsRef<TypedPath<UnknownBase, File>>) {
+//!     let p: &TypedPath<UnknownBase, File> = path.as_ref();
 //!     // Use p...
 //! }
 //!
@@ -69,7 +69,7 @@
 //!     ty: PhantomData,
 //!     path: std::path::PathBuf::from("/test"),
 //! };
-//! takes_asref(&path); // Works thanks to AsRef impl
+//! takes_asref(&path); // Works: Absolute coerces to UnknownBase
 //! # }
 //! ```
 //!
@@ -109,24 +109,24 @@
 //! use phantom_coerce::Coerce;
 //!
 //! # #[derive(Clone)]
-//! # struct Source;
+//! # struct Validated;  // Specific marker
 //! # #[derive(Clone)]
-//! # struct Target;
+//! # struct AnyStatus;  // Generic marker (subsumes Validated, etc.)
 //! #
 //! #[derive(Coerce, Clone)]
-//! #[coerce(cloned = "Message<Target>")]
+//! #[coerce(cloned = "Message<AnyStatus>")]
 //! struct Message<M> {
 //!     marker: PhantomData<M>,
 //!     content: String,
 //! }
 //!
 //! # fn main() {
-//! let msg = Message::<Source> {
+//! let msg = Message::<Validated> {
 //!     marker: PhantomData,
 //!     content: "Hello".to_string(),
 //! };
-//! // Clone and coerce (source remains usable)
-//! let coerced: Message<Target> = msg.to_coerced();
+//! // Clone and coerce to more generic type (source remains usable)
+//! let coerced: Message<AnyStatus> = msg.to_coerced();
 //! assert_eq!(msg.content, "Hello"); // Original still available
 //! # }
 //! ```
