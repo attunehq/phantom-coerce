@@ -31,7 +31,45 @@
 //!     ty: PhantomData,
 //!     path: std::path::PathBuf::from("/test"),
 //! };
+//! // With type inference:
 //! let coerced: &TypedPath<SomeBase, File> = path.coerce();
+//! // Or with turbofish:
+//! let coerced2 = path.coerce::<TypedPath<SomeBase, File>>();
+//! # }
+//! ```
+//!
+//! ## Optional AsRef Integration
+//!
+//! Add the `asref` marker to also generate `AsRef` implementations:
+//!
+//! ```rust
+//! use std::marker::PhantomData;
+//! use phantom_coerce::Coerce;
+//!
+//! # struct Absolute;
+//! # struct Generic;
+//! # struct File;
+//! #
+//! #[derive(Coerce)]
+//! #[coerce(borrowed = "TypedPath<Generic, File>", asref)]
+//! struct TypedPath<Base, Type> {
+//!     base: PhantomData<Base>,
+//!     ty: PhantomData<Type>,
+//!     path: std::path::PathBuf,
+//! }
+//!
+//! fn takes_asref(path: &impl AsRef<TypedPath<Generic, File>>) {
+//!     let p: &TypedPath<Generic, File> = path.as_ref();
+//!     // Use p...
+//! }
+//!
+//! # fn main() {
+//! let path = TypedPath::<Absolute, File> {
+//!     base: PhantomData,
+//!     ty: PhantomData,
+//!     path: std::path::PathBuf::from("/test"),
+//! };
+//! takes_asref(&path); // Works thanks to AsRef impl
 //! # }
 //! ```
 //!
