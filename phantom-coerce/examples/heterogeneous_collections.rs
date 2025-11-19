@@ -1,7 +1,8 @@
-/// Example demonstrating heterogeneous collections with coercion
-///
-/// This shows a key use case: storing items with different specific marker types
-/// in the same collection by coercing them to a common generic type.
+//! Example demonstrating heterogeneous collections with coercion
+//!
+//! This shows a key use case: storing items with different specific marker types
+//! in the same collection by coercing them to a common generic type.
+
 use phantom_coerce::Coerce;
 use std::marker::PhantomData;
 

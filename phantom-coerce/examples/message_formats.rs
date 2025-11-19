@@ -1,7 +1,8 @@
-/// Example demonstrating cloned coercion for message format conversion
-///
-/// This shows how to use phantom types to track message formats, and clone
-/// messages to generic format types for logging or archival purposes.
+//! Example demonstrating cloned coercion for message format conversion
+//!
+//! This shows how to use phantom types to track message formats, and clone
+//! messages to generic format types for logging or archival purposes.
+
 use phantom_coerce::Coerce;
 use std::marker::PhantomData;
 

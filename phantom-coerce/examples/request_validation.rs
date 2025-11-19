@@ -1,7 +1,8 @@
-/// Example demonstrating owned coercion for request validation states
-///
-/// This shows how to use phantom types to track validation state, and coerce
-/// validated requests to a generic "any status" type for storage or API boundaries.
+//! Example demonstrating owned coercion for request validation states
+//!
+//! This shows how to use phantom types to track validation state, and coerce
+//! validated requests to a generic "any status" type for storage or API boundaries.
+
 use phantom_coerce::Coerce;
 use std::marker::PhantomData;
 
