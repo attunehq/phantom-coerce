@@ -10,6 +10,25 @@ When working with phantom types (types that use `PhantomData<T>` for compile-tim
 
 `PhantomData<T>` is zero-sized and has no runtime representation, making coercions between types that differ only in their phantom parameters safe. However, writing these coercions manually is tedious and error-prone. This crate automates the process while maintaining strong safety guarantees.
 
+## Design Philosophy
+
+This library is designed to complement, not replace, strongly-typed marker patterns like typestate. When you have a typestate or similar pattern with specific state transitions (e.g., `Draft -> Review -> Published`), you should continue using those strongly-typed transitions for your core logic.
+
+**This library solves a specific orthogonal problem**: sometimes you need "generic" marker types that are reachable from any specific state. For example:
+
+- Storing heterogeneous collections of values with different marker types
+- Passing values across API boundaries that don't care about specific states
+- Implementing generic handlers that work regardless of the specific marker type
+- Converting to a "known unknown" state when precise type information is no longer needed
+
+By requiring explicit `#[coerce(...)]` annotations, the library ensures that:
+- You explicitly define which generic types are safe and meaningful for your domain
+- Coercion points are auditable and intentional, not automatic
+- Your strongly-typed transitions remain the primary way to change states
+- Generic coercions serve as explicit "escape hatches" when type erasure to a more general type is appropriate
+
+**Example**: In a request validation pipeline, you might have strongly-typed states like `Unvalidated -> HeadersValidated -> FullyValidated`. But you might also want an `AnyStatus` generic marker for when you need to store mixed validation states in a collection or pass requests through generic middleware. This library helps you define those specific "any state → generic state" coercions safely.
+
 ## Features
 
 - **Type-safe**: Compile-time checks ensure only `PhantomData` fields can vary
@@ -113,24 +132,27 @@ Owned coercions allow you to convert `T` to `U`, consuming the original value:
 use std::marker::PhantomData;
 use phantom_coerce::Coerce;
 
-struct Initial;
-struct Final;
+struct Validated;
+struct Unvalidated;
+struct AnyStatus;  // Generic (subsumes Validated and Unvalidated)
 
 #[derive(Coerce)]
-#[coerce(owned = "State<Final>")]
-struct State<S> {
-    marker: PhantomData<S>,
-    data: Vec<String>,
+#[coerce(owned = "Request<AnyStatus>")]
+struct Request<Status> {
+    marker: PhantomData<Status>,
+    url: String,
+    headers: Vec<(String, String)>,
 }
 
 fn main() {
-    let state = State::<Initial> {
+    let validated_req = Request::<Validated> {
         marker: PhantomData,
-        data: vec!["item1".to_string(), "item2".to_string()],
+        url: "https://api.example.com/users".to_string(),
+        headers: vec![("Authorization".to_string(), "Bearer token".to_string())],
     };
 
-    // Convert to different phantom type (owned, consumes original)
-    let final_state: State<Final> = state.into_coerced();
+    // Convert to more generic phantom type (owned, consumes original)
+    let any_req: Request<AnyStatus> = validated_req.into_coerced();
 }
 ```
 
@@ -142,29 +164,30 @@ Cloned coercions allow you to convert `&T` to `U` by cloning, requiring the sour
 use std::marker::PhantomData;
 use phantom_coerce::Coerce;
 
-struct Source;
-struct Target;
+struct Json;
+struct Xml;
+struct AnyFormat;  // Generic (subsumes Json and Xml)
 
 #[derive(Coerce, Clone)]
-#[coerce(cloned = "Message<Target>")]
-struct Message<M> {
-    marker: PhantomData<M>,
+#[coerce(cloned = "Message<AnyFormat>")]
+struct Message<Format> {
+    marker: PhantomData<Format>,
     content: String,
     metadata: Vec<String>,
 }
 
 fn main() {
-    let msg = Message::<Source> {
+    let json_msg = Message::<Json> {
         marker: PhantomData,
-        content: "Hello".to_string(),
-        metadata: vec!["tag1".to_string()],
+        content: r#"{"status": "ok"}"#.to_string(),
+        metadata: vec!["v1".to_string()],
     };
 
-    // Clone and coerce to different phantom type (source remains usable)
-    let coerced: Message<Target> = msg.to_coerced();
+    // Clone and coerce to more generic phantom type (source remains usable)
+    let any_msg: Message<AnyFormat> = json_msg.to_coerced();
 
     // Original is still available
-    println!("{}", msg.content);
+    println!("{}", json_msg.content);
 }
 ```
 
@@ -206,14 +229,14 @@ impl<Base, Type> CoerceRefTypedPath<TypedPath<UnknownBase, File>> for TypedPath<
 For owned coercions:
 
 ```rust
-trait CoerceOwnedState<Output> {
+trait CoerceOwnedRequest<Output> {
     fn into_coerced(self) -> Output;
 }
 
-impl<S> CoerceOwnedState<State<Final>> for State<S> {
-    fn into_coerced(self) -> State<Final> {
+impl<Status> CoerceOwnedRequest<Request<AnyStatus>> for Request<Status> {
+    fn into_coerced(self) -> Request<AnyStatus> {
         // Compile-time safety guard: ensure all fields are accounted for
-        let State { marker: _, data: _ } = &self;
+        let Request { marker: _, url: _, headers: _ } = &self;
 
         // SAFETY: Types differ only in PhantomData type parameters.
         // The destructuring pattern above ensures this at compile time.
@@ -231,11 +254,11 @@ trait CoerceClonedMessage<Output> {
     fn to_coerced(&self) -> Output;
 }
 
-impl<M> CoerceClonedMessage<Message<Target>> for Message<M>
+impl<Format> CoerceClonedMessage<Message<AnyFormat>> for Message<Format>
 where
-    Message<M>: Clone,
+    Message<Format>: Clone,
 {
-    fn to_coerced(&self) -> Message<Target> {
+    fn to_coerced(&self) -> Message<AnyFormat> {
         // Compile-time safety guard: ensure all fields are accounted for
         let Message { marker: _, content: _, metadata: _ } = self;
 

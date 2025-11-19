@@ -81,22 +81,23 @@
 //! use std::marker::PhantomData;
 //! use phantom_coerce::Coerce;
 //!
-//! # struct Initial;
-//! # struct Final;
+//! # struct Validated;
+//! # struct AnyStatus;  // Generic (subsumes Validated)
 //! #
 //! #[derive(Coerce)]
-//! #[coerce(owned = "State<Final>")]
-//! struct State<S> {
-//!     marker: PhantomData<S>,
-//!     data: Vec<i32>,
+//! #[coerce(owned = "Request<AnyStatus>")]
+//! struct Request<Status> {
+//!     marker: PhantomData<Status>,
+//!     url: String,
 //! }
 //!
 //! # fn main() {
-//! let state = State::<Initial> {
+//! let validated_req = Request::<Validated> {
 //!     marker: PhantomData,
-//!     data: vec![1, 2, 3],
+//!     url: "https://api.example.com".to_string(),
 //! };
-//! let final_state: State<Final> = state.into_coerced();
+//! // Coerce to more generic type (owned, consumes original)
+//! let any_req: Request<AnyStatus> = validated_req.into_coerced();
 //! # }
 //! ```
 //!
@@ -109,25 +110,25 @@
 //! use phantom_coerce::Coerce;
 //!
 //! # #[derive(Clone)]
-//! # struct Validated;  // Specific marker
+//! # struct Json;
 //! # #[derive(Clone)]
-//! # struct AnyStatus;  // Generic marker (subsumes Validated, etc.)
+//! # struct AnyFormat;  // Generic format (subsumes Json, Xml, etc.)
 //! #
 //! #[derive(Coerce, Clone)]
-//! #[coerce(cloned = "Message<AnyStatus>")]
-//! struct Message<M> {
-//!     marker: PhantomData<M>,
+//! #[coerce(cloned = "Message<AnyFormat>")]
+//! struct Message<Format> {
+//!     marker: PhantomData<Format>,
 //!     content: String,
 //! }
 //!
 //! # fn main() {
-//! let msg = Message::<Validated> {
+//! let json_msg = Message::<Json> {
 //!     marker: PhantomData,
-//!     content: "Hello".to_string(),
+//!     content: r#"{"status": "ok"}"#.to_string(),
 //! };
 //! // Clone and coerce to more generic type (source remains usable)
-//! let coerced: Message<AnyStatus> = msg.to_coerced();
-//! assert_eq!(msg.content, "Hello"); // Original still available
+//! let any_msg: Message<AnyFormat> = json_msg.to_coerced();
+//! assert_eq!(json_msg.content, r#"{"status": "ok"}"#); // Original still available
 //! # }
 //! ```
 

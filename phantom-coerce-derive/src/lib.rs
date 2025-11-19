@@ -46,22 +46,20 @@ enum CoercionMode {
 /// use std::marker::PhantomData;
 /// use phantom_coerce::Coerce;
 ///
-/// // Type markers: concrete types and their generic equivalents
+/// // Type markers for path bases (specific -> generic)
 /// struct Absolute;
 /// struct Relative;
 /// struct UnknownBase;  // Generic base (subsumes Absolute and Relative)
 ///
+/// // Type markers for path types (specific -> generic)
 /// struct File;
 /// struct Directory;
 /// struct UnknownType;  // Generic type (subsumes File and Directory)
 ///
 /// #[derive(Coerce, Clone)]
-/// // Coerce both params to generic
-/// #[coerce(borrowed = "TypedPath<UnknownBase, UnknownType>", asref)]
-/// // Coerce just the type param to generic
-/// #[coerce(owned = "TypedPath<Absolute, UnknownType>")]
-/// // Coerce just the base param to generic
-/// #[coerce(cloned = "TypedPath<UnknownBase, File>")]
+/// #[coerce(borrowed = "TypedPath<UnknownBase, UnknownType>", asref)]  // Coerce both params to generic
+/// #[coerce(owned = "TypedPath<Absolute, UnknownType>")]  // Coerce just type param to generic
+/// #[coerce(cloned = "TypedPath<UnknownBase, File>")]  // Coerce just base param to generic
 /// struct TypedPath<Base, Type> {
 ///     base: PhantomData<Base>,
 ///     ty: PhantomData<Type>,
@@ -75,11 +73,11 @@ enum CoercionMode {
 ///         path: "/home/user/file.txt".to_string(),
 ///     };
 ///
-///     // Borrowed: coerce to fully generic (both params)
+///     // Borrowed: coerce to more generic type (both params)
 ///     let r1: &TypedPath<UnknownBase, UnknownType> = path.coerce();
 ///     let r2 = path.coerce::<TypedPath<UnknownBase, UnknownType>>();
 ///
-///     // AsRef (when marker is present)
+///     // AsRef: works because we added the asref marker
 ///     let r3: &TypedPath<UnknownBase, UnknownType> = path.as_ref();
 ///
 ///     // Owned: coerce type param to generic (consumes path)
