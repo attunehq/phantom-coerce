@@ -146,8 +146,7 @@ fn main() {
 
     // Log high-priority messages
     // Uses cloned coercion to treat Json message as AnyFormat for logging
-    let high_pri_generic: Message<AnyFormat, High> = json_high.to_coerced();
-    log_high_priority(&high_pri_generic);
+    log_high_priority(&json_high.to_coerced());
 
     // The original json_high is still usable!
     println!(

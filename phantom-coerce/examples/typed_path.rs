@@ -98,20 +98,18 @@ fn main() {
 
     // Coerce to UnknownBase while keeping File type
     println!("Coercing to TypedPath<UnknownBase, File>:");
-    let coerced1: &TypedPath<UnknownBase, File> = file_path.coerce();
-    print_file_path(coerced1);
+    print_file_path(file_path.coerce());
     println!();
 
     // Coerce to UnknownType while keeping Absolute base
     println!("Coercing to TypedPath<Absolute, UnknownType>:");
-    let coerced2: &TypedPath<Absolute, UnknownType> = file_path.coerce();
-    print_absolute_path(coerced2);
+    print_absolute_path(file_path.coerce());
     println!();
 
     // Coerce to fully generic (both parameters unknown)
     println!("Coercing to TypedPath<UnknownBase, UnknownType>:");
-    let coerced3: &TypedPath<UnknownBase, UnknownType> = file_path.coerce();
-    print_any_path(coerced3);
+    // Need turbofish here because multiple target types are possible
+    print_any_path(file_path.coerce::<TypedPath<UnknownBase, UnknownType>>());
     println!();
 
     // Demonstrate AsRef integration
@@ -127,8 +125,7 @@ fn main() {
     println!("Path: {}\n", dir_path.as_path().display());
 
     // This path can also be coerced to UnknownBase, UnknownType
-    let coerced4: &TypedPath<UnknownBase, UnknownType> = dir_path.coerce();
-    print_any_path(coerced4);
+    print_any_path(dir_path.coerce());
 
     println!("\n=== Benefits ===");
     println!("1. Type safety: Cannot accidentally pass a File path to a Directory-only function");
