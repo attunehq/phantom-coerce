@@ -13,7 +13,7 @@ struct UsesT<T> {
 }
 
 #[test]
-fn test_t_generic_name_no_longer_conflicts() {
+fn t_generic_name_no_longer_conflicts() {
     let test = UsesT::<TypeA> {
         phantom: PhantomData,
     };
