@@ -1,16 +1,15 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
-    parse_macro_input, Data, DeriveInput, Fields, Ident,
-    PathArguments, Type, TypePath, Meta, Attribute,
-    parse::Parser, spanned::Spanned,
+    Attribute, Data, DeriveInput, Fields, Ident, Meta, PathArguments, Type, TypePath,
+    parse::Parser, parse_macro_input, spanned::Spanned,
 };
 
 #[derive(Debug, Clone)]
 struct CoercionTarget {
     target_type: String,
     kind: CoercionMode,
-    generate_asref: bool,  // for borrowed only
+    generate_asref: bool, // for borrowed only
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -109,14 +108,14 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     let Data::Struct(data_struct) = &input.data else {
         return Err(syn::Error::new_spanned(
             input,
-            "#[derive(Coerce)] can only be applied to structs"
+            "#[derive(Coerce)] can only be applied to structs",
         ));
     };
 
     let Fields::Named(fields) = &data_struct.fields else {
         return Err(syn::Error::new_spanned(
             &data_struct.fields,
-            "#[derive(Coerce)] requires named fields"
+            "#[derive(Coerce)] requires named fields",
         ));
     };
 
@@ -131,24 +130,25 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     // Parse coerce attributes to extract target types and kinds
     let mut coercions = Vec::new();
     for attr in &input.attrs {
-        if attr.path().is_ident("coerce") {
-            if let Some(coercion) = parse_coerce_attr(attr)? {
-                coercions.push(coercion);
-            }
+        if attr.path().is_ident("coerce")
+            && let Some(coercion) = parse_coerce_attr(attr)?
+        {
+            coercions.push(coercion);
         }
     }
 
     if coercions.is_empty() {
         return Err(syn::Error::new_spanned(
             input,
-            "#[derive(Coerce)] requires at least one #[coerce(...)] attribute"
+            "#[derive(Coerce)] requires at least one #[coerce(...)] attribute",
         ));
     }
 
     let mut output = proc_macro2::TokenStream::new();
 
     // Generate borrowed coercions
-    let borrowed_targets: Vec<_> = coercions.iter()
+    let borrowed_targets: Vec<_> = coercions
+        .iter()
         .filter(|c| c.kind == CoercionMode::Borrowed)
         .collect();
 
@@ -178,12 +178,8 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 
             // Generate AsRef impl if requested
             if target.generate_asref {
-                let asref_impl = generate_asref_impl(
-                    struct_name,
-                    generics,
-                    &trait_name,
-                    &target_type,
-                )?;
+                let asref_impl =
+                    generate_asref_impl(struct_name, generics, &trait_name, &target_type)?;
                 asref_impls.push(asref_impl);
             }
         }
@@ -211,7 +207,8 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     }
 
     // Generate owned coercions
-    let owned_targets: Vec<_> = coercions.iter()
+    let owned_targets: Vec<_> = coercions
+        .iter()
         .filter(|c| c.kind == CoercionMode::Owned)
         .collect();
 
@@ -261,7 +258,8 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
     }
 
     // Generate cloned coercions
-    let cloned_targets: Vec<_> = coercions.iter()
+    let cloned_targets: Vec<_> = coercions
+        .iter()
         .filter(|c| c.kind == CoercionMode::Cloned)
         .collect();
 
@@ -314,10 +312,10 @@ fn impl_coerce(input: &DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
 }
 
 fn is_phantom_data(ty: &Type) -> bool {
-    if let Type::Path(TypePath { path, .. }) = ty {
-        if let Some(segment) = path.segments.last() {
-            return segment.ident == "PhantomData";
-        }
+    if let Type::Path(TypePath { path, .. }) = ty
+        && let Some(segment) = path.segments.last()
+    {
+        return segment.ident == "PhantomData";
     }
     false
 }
@@ -349,21 +347,21 @@ fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<CoercionTarget>> {
                 } else {
                     return Err(syn::Error::new_spanned(
                         &nv.path,
-                        "Expected 'borrowed', 'owned', or 'cloned'"
+                        "Expected 'borrowed', 'owned', or 'cloned'",
                     ));
                 }
 
                 let syn::Expr::Lit(expr_lit) = &nv.value else {
                     return Err(syn::Error::new_spanned(
                         &nv.value,
-                        "Expected string literal"
+                        "Expected string literal",
                     ));
                 };
 
                 let syn::Lit::Str(lit_str) = &expr_lit.lit else {
                     return Err(syn::Error::new_spanned(
                         &expr_lit.lit,
-                        "Expected string literal"
+                        "Expected string literal",
                     ));
                 };
 
@@ -375,14 +373,14 @@ fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<CoercionTarget>> {
                 } else {
                     return Err(syn::Error::new_spanned(
                         &path,
-                        "Expected 'asref' marker (only valid for borrowed coercions)"
+                        "Expected 'asref' marker (only valid for borrowed coercions)",
                     ));
                 }
             }
             _ => {
                 return Err(syn::Error::new_spanned(
                     &meta,
-                    "Expected name-value pair or path"
+                    "Expected name-value pair or path",
                 ));
             }
         }
@@ -391,22 +389,18 @@ fn parse_coerce_attr(attr: &Attribute) -> syn::Result<Option<CoercionTarget>> {
     let mode = mode.ok_or_else(|| {
         syn::Error::new(
             attr.span(),
-            "Missing coercion mode: borrowed, owned, or cloned"
+            "Missing coercion mode: borrowed, owned, or cloned",
         )
     })?;
 
-    let target_type = target_type.ok_or_else(|| {
-        syn::Error::new(
-            attr.span(),
-            "Missing target type in coercion attribute"
-        )
-    })?;
+    let target_type = target_type
+        .ok_or_else(|| syn::Error::new(attr.span(), "Missing target type in coercion attribute"))?;
 
     // Validate asref is only used with borrowed
     if has_asref && mode != CoercionMode::Borrowed {
         return Err(syn::Error::new(
             attr.span(),
-            "asref marker is only valid for borrowed coercions"
+            "asref marker is only valid for borrowed coercions",
         ));
     }
 
@@ -428,7 +422,7 @@ fn generate_borrowed_impl(
     let Type::Path(target_path) = target_type else {
         return Err(syn::Error::new_spanned(
             target_type,
-            "Coerce target must be a type path"
+            "Coerce target must be a type path",
         ));
     };
 
@@ -436,21 +430,29 @@ fn generate_borrowed_impl(
     let PathArguments::AngleBracketed(_target_args) = &target_segment.arguments else {
         return Err(syn::Error::new_spanned(
             target_type,
-            "Coerce target must have type parameters"
+            "Coerce target must have type parameters",
         ));
     };
 
     // Generate destructuring pattern with type annotations for all fields
-    let field_destructure: Vec<_> = fields.named.iter().map(|f| {
-        let field_name = f.ident.as_ref().unwrap();
-        quote! { #field_name: _ }
-    }).collect();
+    let field_destructure: Vec<_> = fields
+        .named
+        .iter()
+        .map(|f| {
+            let field_name = f.ident.as_ref().unwrap();
+            quote! { #field_name: _ }
+        })
+        .collect();
 
-    let field_type_checks: Vec<_> = fields.named.iter().map(|f| {
-        let field_name = f.ident.as_ref().unwrap();
-        let field_ty = &f.ty;
-        quote! { let _: &#field_ty = &self.#field_name; }
-    }).collect();
+    let field_type_checks: Vec<_> = fields
+        .named
+        .iter()
+        .map(|f| {
+            let field_name = f.ident.as_ref().unwrap();
+            let field_ty = &f.ty;
+            quote! { let _: &#field_ty = &self.#field_name; }
+        })
+        .collect();
 
     let (impl_generics, _, where_clause) = generics.split_for_impl();
 
@@ -480,7 +482,7 @@ fn generate_owned_impl(
     let Type::Path(target_path) = target_type else {
         return Err(syn::Error::new_spanned(
             target_type,
-            "Coerce target must be a type path"
+            "Coerce target must be a type path",
         ));
     };
 
@@ -488,15 +490,19 @@ fn generate_owned_impl(
     let PathArguments::AngleBracketed(_target_args) = &target_segment.arguments else {
         return Err(syn::Error::new_spanned(
             target_type,
-            "Coerce target must have type parameters"
+            "Coerce target must have type parameters",
         ));
     };
 
     // Generate destructuring pattern for all fields
-    let field_destructure: Vec<_> = fields.named.iter().map(|f| {
-        let field_name = f.ident.as_ref().unwrap();
-        quote! { #field_name: _ }
-    }).collect();
+    let field_destructure: Vec<_> = fields
+        .named
+        .iter()
+        .map(|f| {
+            let field_name = f.ident.as_ref().unwrap();
+            quote! { #field_name: _ }
+        })
+        .collect();
 
     let (impl_generics, _, where_clause) = generics.split_for_impl();
 
@@ -525,7 +531,7 @@ fn generate_cloned_impl(
     let Type::Path(target_path) = target_type else {
         return Err(syn::Error::new_spanned(
             target_type,
-            "Coerce target must be a type path"
+            "Coerce target must be a type path",
         ));
     };
 
@@ -533,25 +539,34 @@ fn generate_cloned_impl(
     let PathArguments::AngleBracketed(_target_args) = &target_segment.arguments else {
         return Err(syn::Error::new_spanned(
             target_type,
-            "Coerce target must have type parameters"
+            "Coerce target must have type parameters",
         ));
     };
 
     // Build where clause with Clone bound on the struct itself
-    let mut where_clause = generics.where_clause.clone().unwrap_or_else(|| syn::WhereClause {
-        where_token: syn::token::Where::default(),
-        predicates: syn::punctuated::Punctuated::new(),
-    });
+    let mut where_clause = generics
+        .where_clause
+        .clone()
+        .unwrap_or_else(|| syn::WhereClause {
+            where_token: syn::token::Where::default(),
+            predicates: syn::punctuated::Punctuated::new(),
+        });
 
     // Add Clone bound on the entire struct
     let (_, ty_generics, _) = generics.split_for_impl();
-    where_clause.predicates.push(syn::parse_quote!(#struct_name #ty_generics: Clone));
+    where_clause
+        .predicates
+        .push(syn::parse_quote!(#struct_name #ty_generics: Clone));
 
     // Generate destructuring pattern for all fields
-    let field_destructure: Vec<_> = fields.named.iter().map(|f| {
-        let field_name = f.ident.as_ref().unwrap();
-        quote! { #field_name: _ }
-    }).collect();
+    let field_destructure: Vec<_> = fields
+        .named
+        .iter()
+        .map(|f| {
+            let field_name = f.ident.as_ref().unwrap();
+            quote! { #field_name: _ }
+        })
+        .collect();
 
     let (impl_generics, _, _) = generics.split_for_impl();
 
@@ -586,4 +601,3 @@ fn generate_asref_impl(
         }
     })
 }
-

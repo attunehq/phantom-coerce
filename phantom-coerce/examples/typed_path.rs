@@ -1,12 +1,11 @@
+use phantom_coerce::Coerce;
 /// Example demonstrating phantom-coerce with a TypedPath system
 ///
 /// This example shows how to use PhantomData to track path types at compile-time,
 /// and how to use the Coerce derive macro to safely coerce between different
 /// phantom type parameters.
-
 use std::marker::PhantomData;
 use std::path::PathBuf;
-use phantom_coerce::Coerce;
 
 // Base path types (tracking whether path is absolute or relative)
 struct Absolute;
@@ -78,9 +77,8 @@ fn process_file_path(path: &impl AsRef<TypedPath<UnknownBase, File>>) {
 
 fn main() {
     // Create a specific typed path
-    let file_path = TypedPath::<Absolute, File>::new_absolute_file(
-        PathBuf::from("/home/user/document.txt")
-    );
+    let file_path =
+        TypedPath::<Absolute, File>::new_absolute_file(PathBuf::from("/home/user/document.txt"));
 
     println!("=== Demonstrating type coercion ===\n");
 
@@ -112,9 +110,7 @@ fn main() {
     println!();
 
     // Create another path with different types
-    let dir_path = TypedPath::<Relative, Directory>::new_relative_dir(
-        PathBuf::from("./my_folder")
-    );
+    let dir_path = TypedPath::<Relative, Directory>::new_relative_dir(PathBuf::from("./my_folder"));
 
     println!("=== Another example ===\n");
     println!("Original type: TypedPath<Relative, Directory>");

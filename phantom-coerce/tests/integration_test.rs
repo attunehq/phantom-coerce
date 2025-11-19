@@ -1,5 +1,5 @@
-use std::marker::PhantomData;
 use phantom_coerce::Coerce;
+use std::marker::PhantomData;
 
 // Type-level markers for testing
 struct Absolute;
@@ -387,4 +387,3 @@ fn test_turbofish_syntax() {
     let coerced_cloned = cloned.to_coerced::<Cloned<OtherMarker>>();
     assert_eq!(coerced_cloned.get_value(), "turbofish");
 }
-
