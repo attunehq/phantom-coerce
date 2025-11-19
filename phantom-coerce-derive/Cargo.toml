@@ -1,9 +1,16 @@
 [package]
 name = "phantom-coerce-derive"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0"
 description = "Proc macro implementation for phantom-coerce"
+repository = "https://github.com/attunehq/phantom-coerce"
+documentation = "https://docs.rs/phantom-coerce-derive"
+homepage = "https://github.com/attunehq/phantom-coerce"
+readme = "../README.md"
+keywords = ["phantom", "coerce", "type-safety", "zero-cost"]
+categories = ["rust-patterns", "no-std"]
+authors = ["Attune <engineering@attune.com>"]
 
 [lib]
 proc-macro = true
